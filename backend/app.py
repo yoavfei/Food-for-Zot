@@ -1,4 +1,4 @@
-# file for flask backend routing
+# File for flask backend routing
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -12,6 +12,10 @@ CORS(app)  # Enable CORS for Next.js frontend
 cred = credentials.Certificate("food-for-zot-firebase-adminsdk-fbsvc-f018325808.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
+
+@app.route('/')
+def home():
+    return 'Page for backend testing'
 
 @app.route('/api/users', methods=['GET'])
 def get_users():
@@ -37,4 +41,6 @@ def get_user(user_id):
     return jsonify({'error': 'User not found'}), 404
 
 if __name__ == "__main__":
+    # This is for testing only
+    # To see a page's output, go to [port web link]/[path to page]
     app.run(debug=True, port=5000)
