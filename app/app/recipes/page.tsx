@@ -1,1 +1,7 @@
-// page that shows recipes created by user
+export default function Recipes () {
+    return (
+        <div>
+            recipes...
+        </div>
+    );
+}

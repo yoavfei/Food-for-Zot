@@ -6,9 +6,6 @@ import { signOut } from 'firebase/auth';
 const navItems = [
   { name: 'Groceries', href: '/app', icon: '🛒' },
   { name: 'My Recipes', href: '/app/recipes', icon: '🍽️' },
-  { name: 'Discover', href: '/app/discover', icon: '✨' },
-  { name: 'Compare Prices', href: '/app/compare', icon: '💰' },
-  { name: 'Settings', href: '/app/settings', icon: '⚙️' },
 ];
 
 const navigateReplace = (path: string) => {
