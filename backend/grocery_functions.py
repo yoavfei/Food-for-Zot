@@ -1,10 +1,10 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-cred = credentials.Certificate("path/to/serviceAccountKey.json")
-app = firebase_admin.initialize_app(cred)
+# Initialize Firebase
+cred = credentials.Certificate("food-for-zot-firebase-adminsdk-fbsvc-f018325808.json")
+firebase_admin.initialize_app(cred)
 db = firestore.client()
-
 
 
 class Food():
@@ -24,10 +24,5 @@ def add_interval():
 
 
 if __name__ == "__main__":
-    user_ref = db.collection('users').document('yoav')
-    doc = user_ref.get()
-    if doc.exists:
-        print(f"Document data: {doc.to_dict()}")
-    else:
-        print("No such document!")
+    pass
 
