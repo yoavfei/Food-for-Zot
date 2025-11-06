@@ -62,3 +62,6 @@ hosting/.cache
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vscode/settings.json
+food-for-zot-firebase-adminsdk-fbsvc-f018325808.json
