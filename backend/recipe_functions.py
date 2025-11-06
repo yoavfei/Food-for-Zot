@@ -1,19 +1,24 @@
-from google import genai
+import google.generativeai as genai
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
-api_key = os.getenv("API_KEY")
+GEMINI_API_KEY = os.getenv("API_KEY")
 
-client = genai.Client()
+# client = genai.Client()
 
 def get_recipe():
-    recipe = client.models.generate_content(
-        model="gemini-2.5-flash", contents="Give me a recipe."
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-2.5-flash")
+    recipe = model.generate_content("Give me a recipe in the format: {ingredients: {list of ingredients}, quantities: {respective list of quantities}, instructions: {string of instructions}}"
     )
 
+    return recipe.text
+
+def itemize_recipe():
     pass
 
 
 if __name__ == "__main__":
-    pass
+    # print(get_recipe())
+
