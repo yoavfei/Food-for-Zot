@@ -1,7 +1,8 @@
 import firebase_admin
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 
-app = firebase_admin.initialize_app()
+cred = credentials.Certificate("path/to/serviceAccountKey.json")
+app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 
@@ -23,5 +24,10 @@ def add_interval():
 
 
 if __name__ == "__main__":
-    pass
+    user_ref = db.collection('users').document('yoav')
+    doc = user_ref.get()
+    if doc.exists:
+        print(f"Document data: {doc.to_dict()}")
+    else:
+        print("No such document!")
 
