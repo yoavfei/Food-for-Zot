@@ -56,7 +56,7 @@ export function Sidebar() {
       className={`
         bg-white border-r border-gray-100 p-4 shadow-lg flex flex-col flex-shrink-0 relative
         transition-all duration-300 ease-in-out
-        rounded-tr-2xl rounded-br-2xl
+        rounded-tr-2xl rounded-br-2xl sticky h-screen top-0
         ${isExpanded ? 'w-64' : 'w-20'}
       `}
     >

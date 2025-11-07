@@ -128,6 +128,22 @@ def delete_list(list_id):
         return ('', 204)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/lists/<list_id>', methods=['PATCH'])
+def update_list(list_id):
+    """ Updates a single list document (e.g., changes its name). """
+    try:
+        data = request.get_json() # e.g., { "name": "New List Name" }
+        
+        doc_ref = db.collection("lists").document(list_id)
+        
+        if not doc_ref.get().exists:
+            return jsonify({"error": "List not found"}), 404
+            
+        doc_ref.update(data)
+        return jsonify({"message": "List updated"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 ######################################################
 # CRUD for List Items

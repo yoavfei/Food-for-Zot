@@ -35,7 +35,7 @@ interface Recipe {
 }
 
 const LoadingState = () => (
-  <div className="flex justify-center items-center p-12 mt-10">
+  <div className="flex justify-center items-center w-full h-full">
     <Loader2 className="h-16 w-16 text-green-600 animate-spin" />
   </div>
 );
@@ -115,16 +115,16 @@ export default function MyRecipesPage() {
     onOpen('deleteConfirm', {
       title: `Delete "${recipeName}"?`,
       description: 'This recipe will be permanently deleted and cannot be recovered.',
-      onConfirm: () => { 
-        setRecipes((currentRecipes) => 
+      onConfirm: () => {
+        setRecipes((currentRecipes) =>
           currentRecipes.filter((r) => r.id !== recipeId)
         );
-        
+
         return fetch(`${API_URL}/api/recipes/${recipeId}`, {
           method: 'DELETE',
         }).then((res) => {
           if (!res.ok) {
-            triggerRefetch(); 
+            triggerRefetch();
             throw new Error('Failed to delete on server.');
           }
         });
@@ -140,10 +140,15 @@ export default function MyRecipesPage() {
     router.push(`/app/recipes/${recipeId}`);
   }
 
+  if (isLoading) {
+    return (
+      <div className='flex items-center justify-center w-full h-full'>
+        <LoadingState />
+      </div>
+    );
+  }
+
   const renderContent = () => {
-    if (isLoading) {
-      return <LoadingState />;
-    }
     if (error) {
       return <ErrorState message={error} />;
     }
