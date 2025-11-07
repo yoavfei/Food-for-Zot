@@ -1,0 +1,6 @@
+beautifulsoup4
+firebase_admin
+Flask
+flask-cors
+google-generativeai
+python-dotenv
