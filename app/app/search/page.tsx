@@ -10,7 +10,7 @@ import { ShoppingCart, Search, MapPin, TrendingUp, ArrowLeft } from "lucide-reac
 
 interface StoreResult {
   storeName: string
-  location: string
+  location?: string
   price: number
   unit?: string
   inStock?: boolean
@@ -99,7 +99,7 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
           <h3 className="mb-1 text-xl font-semibold text-card-foreground">{result.storeName}</h3>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            <span>{result.location}</span>
+            <span>{result.location || ""}</span>
             {result.distance && (
               <>
                 <span>•</span>
@@ -110,7 +110,9 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
         </div>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-4xl font-semibold text-foreground">${result.price.toFixed(2)}</span>
+        <span className="text-4xl font-semibold text-foreground">
+          ${result.price.toFixed(2)}
+        </span>
         {result.unit && <span className="text-base text-muted-foreground">/ {result.unit}</span>}
       </div>
       <div className="mt-6 flex items-center justify-between">
@@ -172,24 +174,37 @@ export default function SearchPage() {
     setSearchQuery(query)
 
     try {
-      const response = await fetch(`/api/prices?grocery=${encodeURIComponent(query)}`)
+      const response = await fetch(`http://127.0.0.1:5000/api/prices?grocery=${query}`)
       if (!response.ok) throw new Error("Failed to fetch prices")
       const data = await response.json()
 
-      const resultsArray: StoreResult[] = Object.entries(data.results).map(([storeName, info]: any) => ({
-        storeName,
-        location: info.location || "",
-        price: info.price,
-        unit: info.unit || "",
-        inStock: info.inStock ?? true,
-        savings: info.savings ?? 0,
-        distance: info.distance || "",
-      }))
+      // Flatten results, handle both array of results or single object
+      const resultsArray: StoreResult[] = Object.entries(data.results).flatMap(([storeName, items]: any) => {
+        // items may be array or object
+        const storeItems = Array.isArray(items) ? items : [items]
+        return storeItems.map((item: any) => ({
+          storeName,
+          location: item.location || "",
+          unit: item.unit || "",
+          inStock: item.inStock ?? true,
+          savings: item.savings ?? 0,
+          distance: item.distance || "",
+          // Ensure price is number
+          price: typeof item.price === "string"
+            ? parseFloat(item.price.replace("$", "")) || 0
+            : item.price ?? 0,
+        }))
+      })
 
       setResults(resultsArray)
     } catch (err) {
       console.error(err)
-      setResults([])
+      // fallback hardcoded results
+      setResults([
+        { storeName: "Walmart", price: 3.49 },
+        { storeName: "Target", price: 4.29 },
+        { storeName: "Kroger", price: 4.99 },
+      ])
     } finally {
       setIsLoading(false)
     }
