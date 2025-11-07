@@ -1,235 +1,371 @@
-'use client'; // This page is interactive, so it must be a Client Component
+'use client';
 
-import { useState } from 'react';
-import { Search, Plus, Check, X, ListX } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useAuth } from '@/hooks/use-auth';
+import { useModal } from '@/hooks/use-modal-store';
+import {
+  Search,
+  Plus,
+  Check,
+  X,
+  ListX,
+  Loader2,
+  AlertTriangle,
+  Trash2,
+  Pencil,
+} from 'lucide-react';
 
-// --- Define the data types ---
 interface GroceryItem {
   id: string;
   name: string;
   purchased: boolean;
 }
-
 interface GroceryList {
   id: string;
   name: string;
-  items: GroceryItem[];
+  ownerId: string;
 }
+const LoadingState = () => (
+  <div className="flex justify-center items-center p-12 mt-10">
+    <Loader2 className="h-16 w-16 text-green-600 animate-spin" />
+  </div>
+);
+const ErrorState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center text-center p-12 bg-red-50 rounded-2xl shadow-sm border border-red-200">
+    <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
+    <h2 className="text-2xl font-semibold text-red-800 mb-2">
+      Error Loading Groceries
+    </h2>
+    <p className="text-red-600 max-w-sm">{message}</p>
+  </div>
+);
 
-// --- Mock Data (Backend replacement) ---
-const MOCK_DATA: GroceryList[] = [
-  {
-    id: 'list1',
-    name: 'Weekly Shop',
-    items: [
-      { id: 'item1', name: 'Milk (1 Gallon)', purchased: false },
-      { id: 'item2', name: 'Eggs (Dozen)', purchased: true },
-      { id: 'item3', name: 'Bread', purchased: false },
-    ],
-  },
-  {
-    id: 'list2',
-    name: 'Party Supplies',
-    items: [
-      { id: 'item4', name: 'Chips', purchased: false },
-      { id: 'item5', name: 'Salsa', purchased: false },
-    ],
-  },
-];
-
-// --- Main Page Component ---
 export default function GroceriesDashboardPage() {
-  // --- State Hooks ---
-  const [lists, setLists] = useState<GroceryList[]>(MOCK_DATA);
-  const [activeListId, setActiveListId] = useState<string>('list1');
+  const { user } = useAuth();
+  const { onOpen, refetchId, triggerRefetch } = useModal(); // Get triggerRefetch
+
+  const [lists, setLists] = useState<GroceryList[]>([]);
+  const [activeListId, setActiveListId] = useState<string | null>(null);
+
+  const [items, setItems] = useState<GroceryItem[]>([]);
   const [newItemName, setNewItemName] = useState('');
 
-  // --- Helper: Find the currently active list ---
-  const activeList = lists.find((list) => list.id === activeListId);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isItemsLoading, setIsItemsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  // --- Data Fetching ---
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchLists = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_URL}/api/lists?userId=${user.uid}`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch your lists.');
+        }
+        const data: GroceryList[] = await res.json();
+        setLists(data);
+
+        if (data.length > 0) {
+          const currentListExists = data.some((list) => list.id === activeListId);
+          if (!activeListId || !currentListExists) {
+            setActiveListId(data[0].id);
+          }
+        } else {
+          setActiveListId(null);
+          setItems([]);
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchLists();
+  }, [user, API_URL, refetchId, activeListId]);
+
+  useEffect(() => {
+    if (isLoading || !activeListId) {
+      if (!activeListId) setItems([]);
+      return;
+    }
+
+    const fetchItems = async () => {
+      setIsItemsLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/lists/${activeListId}/items`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch items for this list.');
+        }
+        const data: GroceryItem[] = await res.json();
+        setItems(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsItemsLoading(false);
+      }
+    };
+    fetchItems();
+  }, [activeListId, API_URL, isLoading]);
 
   // --- Event Handlers ---
 
-  /**
-   * Toggles the 'purchased' status of an item in the active list.
-   */
-  const handleToggleItem = (itemId: string) => {
-    setLists(
-      lists.map((list) =>
-        list.id === activeListId
-          ? {
-            ...list,
-            items: list.items.map((item) =>
-              item.id === itemId
-                ? { ...item, purchased: !item.purchased }
-                : item
-            ),
-          }
-          : list
+  const handleToggleItem = async (itemId: string, currentStatus: boolean) => {
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === itemId ? { ...item, purchased: !currentStatus } : item
       )
     );
+    try {
+      await fetch(`${API_URL}/api/lists/${activeListId}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ purchased: !currentStatus }),
+      });
+    } catch (err) {
+      setError('Failed to update item. Please reload.');
+    }
   };
 
-  /**
-   * Adds a new item to the active list.
-   */
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName.trim() || !activeList) return;
+    if (!newItemName.trim() || !activeListId) return;
 
-    const newItem: GroceryItem = {
-      id: `item-${Date.now()}`, // Simple unique ID
+    const newItemData = {
       name: newItemName.trim(),
       purchased: false,
     };
 
-    setLists(
-      lists.map((list) =>
-        list.id === activeListId
-          ? { ...list, items: [newItem, ...list.items] } // Add to top
-          : list
-      )
-    );
-    setNewItemName(''); // Clear input field
+    try {
+      const res = await fetch(`${API_URL}/api/lists/${activeListId}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newItemData),
+      });
+
+      if (!res.ok) throw new Error('Failed to add item.');
+      const addedItem: GroceryItem = await res.json();
+      setNewItemName('');
+      setItems((currentItems) => [addedItem, ...currentItems]);
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to add item. Please try again.');
+    }
   };
 
-  /**
-   * Deletes an item from the active list.
-   */
-  const handleDeleteItem = (itemId: string) => {
-    setLists(
-      lists.map((list) =>
-        list.id === activeListId
-          ? {
-            ...list,
-            items: list.items.filter((item) => item.id !== itemId),
-          }
-          : list
-      )
+  const handleDeleteItem = async (itemId: string) => {
+    setItems((currentItems) =>
+      currentItems.filter((item) => item.id !== itemId)
     );
+    try {
+      await fetch(`${API_URL}/api/lists/${activeListId}/items/${itemId}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      setError('Failed to delete item. Please reload.');
+    }
   };
+
+  const handleDeleteList = async (listId: string) => {
+    const listName = lists.find(list => list.id === listId)?.name || "this list";
+
+    onOpen('deleteConfirm', {
+      title: `Delete "${listName}"?`,
+      description: 'All items in this list will be permanently deleted. This cannot be undone.',
+      onConfirm: () => {
+        return fetch(`${API_URL}/api/lists/${listId}`, {
+          method: 'DELETE',
+        }).then((res) => {
+          if (!res.ok) {
+            throw new Error('Failed to delete list on server.');
+          }
+          triggerRefetch();
+        });
+      }
+    });
+  };
+
+  if (isLoading || isItemsLoading) {
+    return (
+      <div className='flex items-center justify-center w-full h-full'>
+        <LoadingState />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <ErrorState message={error} />;
+  }
 
   return (
     <div className="w-full bg-background/95">
-      {/* 1. Header */}
-      <h1 className="text-4xl font-extrabold text-gray-800 mb-6">
+      <h1 className="text-4xl font-extrabold text-gray-800 mb-12">
         My Groceries
       </h1>
 
-      {/* 2. Tabbed List Navigation */}
-      <div className="flex items-center border-b-1 border-gray-200 mb-6">
+      <div className="flex items-center border-b-2 border-gray-200 mb-6">
         {lists.map((list) => (
-          <button
+          <div
             key={list.id}
-            onClick={() => setActiveListId(list.id)}
-            className={`py-3 px-5 text-lg font-semibold transition-all duration-150 cursor-pointer border-b-2
+            className={`flex items-center transition-all duration-150 border-b-2
               ${activeListId === list.id
-                ? 'border-green-600 text-green-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-green-600'
+                : 'border-transparent'
               }`}
           >
-            {list.name}
-          </button>
+            <button
+              onClick={() => setActiveListId(list.id)}
+              className={`py-3 px-5 text-lg font-semibold
+                ${activeListId === list.id
+                  ? 'text-green-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              {list.name}
+            </button>
+
+            {/* Show delete button ONLY for the active list */}
+            {activeListId === list.id && (
+              <div className="flex items-center pr-2">
+                <button
+                  onClick={() => onOpen('editList', { listId: list.id, listName: list.name })}
+                  className="p-1 text-gray-400 hover:text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+                  title="Edit list name"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteList(list.id)}
+                  className="p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 transition-colors"
+                  title="Delete this list"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
         ))}
         <button
-          onClick={() => alert('New List feature coming soon!')}
-          className="ml-4 py-2 px-3 text-lg font-bold text-green-600 hover:text-green-800 cursor-pointer"
+          onClick={() => onOpen('createList')}
+          className="ml-4 p-2 text-green-600 hover:bg-green-100 rounded-full transition-colors"
+          title="Create new list"
         >
-          +
+          <Plus className="h-6 w-6" />
         </button>
       </div>
 
-      {/* 3. Add New Item Form */}
-      <form onSubmit={handleAddItem} className="flex gap-3 mb-6">
 
-        {/* Search Bar Input */}
-        <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            value={newItemName}
-            onChange={(e) => setNewItemName(e.target.value)}
-            placeholder="Search or add an item (e.g., 2% Milk)"
-            className="flex-1 w-full pl-12 pr-4 py-3 border bg-white border-gray-300 rounded-lg shadow-sm 
-                 focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
+      {lists.length === 0 && !isLoading ? (
+        <div className="flex flex-col items-center justify-center text-center p-12 mt-10 bg-white rounded-2xl shadow-sm border border-gray-200">
+          <ListX className="h-16 w-16 text-gray-400 mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+            No Grocery Lists
+          </h2>
+          <p className="text-gray-500 mb-6 max-w-sm">
+            Click the "+" button above to create your first list.
+          </p>
         </div>
+      ) : null}
 
-        {/* Add Button (Icon-only) */}
-        <button
-          type="submit"
-          className="flex-shrink-0 px-4 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md 
-               hover:bg-green-700 focus:outline-none focus:ring-2 
-               focus:ring-green-500 focus:ring-offset-2 cursor-pointer
-               flex items-center justify-center"
-          aria-label="Add item"
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-      </form>
+      {activeListId && (
+        <>
+          <form onSubmit={handleAddItem} className="flex gap-3 mb-6">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="Search or add an item (e.g., 2% Milk)"
+                className="flex-1 w-full pl-12 pr-4 py-3 border bg-white border-gray-300 rounded-lg shadow-sm 
+                   focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <button
+              type="submit"
+              className="flex-shrink-0 px-4 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md 
+                         hover:bg-green-700 focus:outline-none focus:ring-2 
+                         focus:ring-green-500 focus:ring-offset-2
+                         flex items-center justify-center"
+              aria-label="Add item"
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          </form>
 
-      {/* 4. Active Grocery List Items */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
-        <ul className="divide-y divide-gray-200">
-          {activeList && activeList.items.length > 0 ? (
-            activeList.items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center gap-4 px-4 py-4 transition-all hover:bg-gray-50"
-              >
-                {/* --- Modern Checkbox --- */}
-                <button
-                  onClick={() => handleToggleItem(item.id)}
-                  className={`
-              flex-shrink-0 h-6 w-6 rounded-md border-2 
-              flex items-center justify-center transition-all cursor-pointer
-              focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
-              ${item.purchased
-                      ? 'bg-green-600 border-green-600'
-                      : 'border-gray-300 bg-white hover:border-gray-400'
-                    }
-            `}
-                  aria-label="Toggle item"
-                >
-                  {item.purchased && <Check className="h-4 w-4 text-white" />}
-                </button>
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
+            <ul className="divide-y divide-gray-200">
+              {items.length > 0 ? (
+                items
+                  .sort((a, b) => {
+                    return a.purchased === b.purchased ? 0 : a.purchased ? 1 : -1;
+                  })
+                  .map((item) => (
+                    <li
+                      key={item.id}
+                      className="flex items-center gap-4 px-4 py-4 transition-all hover:bg-gray-50"
+                    >
+                      <button
+                        onClick={() => handleToggleItem(item.id, item.purchased)}
+                        className={`
+                        flex-shrink-0 h-6 w-6 rounded-md border-2 
+                        flex items-center justify-center transition-all
+                        focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
+                        ${item.purchased
+                            ? 'bg-green-600 border-green-600'
+                            : 'border-gray-300 bg-white hover:border-gray-400'
+                          }
+                      `}
+                        aria-label="Toggle item"
+                      >
+                        {item.purchased && (
+                          <Check className="h-4 w-4 text-white" />
+                        )}
+                      </button>
 
-                {/* --- Item Name --- */}
-                <span
-                  className={`
-              flex-1 text-base font-medium text-gray-700
-              ${item.purchased ? 'line-through text-gray-400' : ''}
-            `}
-                >
-                  {item.name}
-                </span>
+                      <span
+                        className={`
+                        flex-1 text-base font-medium text-gray-700
+                        ${item.purchased ? 'line-through text-gray-400' : ''}
+                      `}
+                      >
+                        {item.name}
+                      </span>
 
-                {/* --- Delete Button --- */}
-                <button
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="ml-auto p-1 text-gray-400 hover:text-red-600 
-                       rounded-full hover:bg-red-100 transition-all cursor-pointer"
-                  aria-label="Delete item"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </li>
-            ))
-          ) : (
-            // --- Modern Empty State ---
-            <li className="flex flex-col items-center justify-center text-center p-12">
-              <ListX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700">
-                List is Empty
-              </h3>
-              <p className="text-sm text-gray-500">
-                Use the search bar above to add your first item.
-              </p>
-            </li>
-          )}
-        </ul>
-      </div>
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="ml-auto p-1 text-gray-400 hover:text-red-600 
+                                 rounded-full hover:bg-red-100 transition-all"
+                        aria-label="Delete item"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </li>
+                  ))
+              ) : (
+                <li className="flex flex-col items-center justify-center text-center p-12">
+                  <ListX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-700">
+                    List is Empty
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Use the search bar above to add your first item.
+                  </p>
+                </li>
+              )}
+            </ul>
+          </div>
+        </>
+      )}
     </div>
   );
 }

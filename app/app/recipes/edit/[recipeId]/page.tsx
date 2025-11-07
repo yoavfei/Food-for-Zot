@@ -12,6 +12,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { toast } from 'react-hot-toast';
 
 interface IngredientField {
   id: string;
@@ -138,26 +139,25 @@ export default function EditRecipePage() {
       ingredients: finalIngredients,
     };
 
-    try {
-      const res = await fetch(`${API_URL}/api/recipes/${recipeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recipeData),
-      });
+    const promise = fetch(`${API_URL}/api/recipes/${recipeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recipeData),
+    }).then((res) => {
+      if (!res.ok) throw new Error('Failed to update recipe.');
+    });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to update recipe.');
+    toast.promise(
+      promise,
+      {
+        loading: 'Saving changes...',
+        success: (data) => {
+          router.push('/app/recipes');
+          return 'Recipe updated successfully!';
+        },
+        error: (err) => err.message,
       }
-
-      alert('Recipe updated successfully!');
-      router.push('/app/recipes');
-    } catch (err: any) {
-      console.error('Error updating recipe:', err);
-      alert(`An error occurred: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    ).finally(() => setIsSubmitting(false)); 
   };
 
   if (isLoading) {

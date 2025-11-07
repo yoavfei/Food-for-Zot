@@ -11,6 +11,7 @@ import {
   Clock, // Import Clock icon
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { toast } from 'react-hot-toast';
 
 interface IngredientField {
   id: string;
@@ -60,9 +61,8 @@ export default function NewRecipePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) {
-      alert('You must be logged in to create a recipe.');
+      toast.error('You must be logged in to create a recipe.');
       return;
     }
 
@@ -70,41 +70,38 @@ export default function NewRecipePage() {
 
     const finalIngredients = ingredients.map(({ name, quantity }) => ({
       name: name,
-      amount: quantity,
+      amount: quantity
     }));
 
     const recipeData = {
       name,
       description,
       imageUrl: imageUrl || '',
-      prepTime: prepTime || '', // Add to data
-      cookTime: cookTime || '', // Add to data
+      prepTime: prepTime || '',
+      cookTime: cookTime || '',
       ingredients: finalIngredients,
-      ownerId: user.uid,
+      ownerId: user.uid
     };
 
-    try {
-      const res = await fetch(`${API_URL}/api/recipes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recipeData),
-      });
+    const promise = fetch(`${API_URL}/api/recipes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recipeData),
+    }).then((res) => {
+      if (!res.ok) throw new Error('Failed to save recipe.');
+    });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(
-          errorData.error || 'Failed to save recipe on the server.'
-        );
+    toast.promise(
+      promise,
+      {
+        loading: 'Saving new recipe...',
+        success: (data) => {
+          router.push('/app/recipes');
+          return 'Recipe saved successfully!';
+        },
+        error: (err) => err.message,
       }
-
-      alert('Recipe saved successfully!');
-      router.push('/app/recipes');
-    } catch (err: any) {
-      console.error('Error saving recipe:', err);
-      alert(`An error occurred: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    ).finally(() => setIsSubmitting(false)); 
   };
 
   return (
