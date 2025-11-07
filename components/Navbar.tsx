@@ -24,12 +24,6 @@ function Navbar() {
                     >
                         Features
                     </a>
-                    <Link
-                        href="/search"
-                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground ml-2"
-                    >
-                        Search
-                    </Link>
                     <Button size="sm" className="ml-2" onClick={() => router.push('/login')}>
                         Get Started
                     </Button>
