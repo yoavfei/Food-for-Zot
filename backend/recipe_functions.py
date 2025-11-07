@@ -2,8 +2,9 @@ import google.generativeai as genai
 from firebase_admin import firestore
 from dotenv import load_dotenv
 import os
-import firebase
 import ast
+
+from firebase_setup import db
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('API_KEY')
@@ -17,11 +18,12 @@ def get_random_recipe():
 
     return recipe.text
 
-def get_ingredient_recipe(ingredient):
+def get_ingredient_recipe(ingredients_list: list):
+    ingredient_str = ", ".join(ingredients_list) 
+
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-flash')
-    recipe = model.generate_content(f'Give me a recipe that includes {ingredient} in the format: {{name: name of recipe, ingredients: {{name, amount}}, {{name, amount}}, instructions: string of instructions}}". Do not include "```json```"')
-
+    recipe = model.generate_content(f'Give me a recipe that includes {ingredient_str}...')
     return recipe.text
 
 def get_specific_recipe(food):
@@ -33,61 +35,23 @@ def get_specific_recipe(food):
 
 ########## ADD FUNCTIONS ##############
 
-def add_recipe(user: str, recipe: str):
-    recipe = ast.literal_eval(recipe)
-
-    doc_ref = firebase.db.collection('recipes').document(user)
-
-    name = recipe['name']
-    ingredients = recipe['ingredients']
-    instructions = recipe['instructions']
-
-    doc_ref.update({name: 
-                {'ingredients': ingredients, 
-                'instructions': instructions}})
-    
-def add_ingredient(user: str, recipe: str, name: str, amount: str):
-    doc_ref = firebase.db.collection('recipes').document(user)
-
-    new_ingredient = {'ingredients': {'name': name, 'amount': amount}}
-    doc_ref.update({f'{recipe}.ingredients': firestore.ArrayUnion([new_ingredient])})
-
-# def add_instructions(user: str, recipe: str, instructions: str):
-#     doc_ref = firebase.db.collection('recipes').document(user)
-
-#     doc_ref.update({f'{recipe}.instructions': instructions})
+def add_recipe(user_id: str, recipe_str: str):
+    recipe_data = ast.literal_eval(recipe_str)
+    recipe_data['ownerId'] = user_id
+    recipe_data['createdAt'] = firestore.SERVER_TIMESTAMP
+    doc_ref = db.collection('recipes').add(recipe_data)
+    return doc_ref[1].id
     
 ######### EDITING FUNCTIONS ############    
 
-def edit_recipe_name(user: str, recipe: str, new_name: str):
-    doc_ref = firebase.db.collection('recipes').document(user)
-    data = doc_ref.get().to_dict()
-    recipe_info = data.get(recipe)
-
-    doc_ref.update({new_name: recipe_info,
-                    recipe: firestore.DELETE_FIELD})
-
-def edit_recipe_ingredient_name(user: str, recipe: str, old_ingredient: str, new_ingredient: str):
-    pass
-
-def edit_recipe_ingredient_amount(user: str, recipe: str, new_amount: str):
-    pass
-
-def edit_recipe_instructions(user: str, recipe: str, instructions: str):
-    doc_ref = firebase.db.collection('recipes').document(user)
-
-    doc_ref.update({f'{recipe}.instructions': instructions})
+def update_recipe(recipe_id: str, new_data: dict):
+    doc_ref = db.collection('recipes').document(recipe_id)
+    doc_ref.update(new_data)
 
 ######## DELETING FUNCTIONS ############
-def delete_recipe(user: str, recipe: str):
-    doc_ref = firebase.db.collection('recipes').document(user)
-    doc_ref.update({recipe: firestore.DELETE_FIELD})
-
-def delete_ingredient(user: str, recipe: str, name: str, amount: str):
-    doc_ref = firebase.db.collection('recipes').document(user)
-
-    doc_ref.update({f'{recipe}.ingredients': 
-                    firestore.ArrayRemove([{'name': name, 'amount': amount}])})
+def delete_recipe(recipe_id: str):
+    doc_ref = db.collection('recipes').document(recipe_id)
+    doc_ref.delete()
 
 
 if __name__ == "__main__":

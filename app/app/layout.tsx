@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth'
 import { LoadingScreen } from '@/components/layout/LoadingScreen';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { useEffect } from 'react';
 
 export default function PrivateAppLayout({
   children,
@@ -13,13 +14,14 @@ export default function PrivateAppLayout({
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
+
   if (loading) {
     return <LoadingScreen />;
-  }
-
-  if (!user) {
-    router.replace('/login');
-    return null;
   }
 
   return (
