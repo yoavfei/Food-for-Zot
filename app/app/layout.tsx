@@ -23,7 +23,7 @@ export default function PrivateAppLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen">
       <Sidebar />
       <main className="flex-1 p-6 lg:p-10 overflow-auto">
         {children}

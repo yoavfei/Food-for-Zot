@@ -15,7 +15,7 @@ interface GroceryList {
   items: GroceryItem[];
 }
 
-// Mock Data 
+// --- Mock Data (Backend replacement) ---
 const MOCK_DATA: GroceryList[] = [
   {
     id: 'list1',
@@ -36,13 +36,21 @@ const MOCK_DATA: GroceryList[] = [
   },
 ];
 
+// --- Main Page Component ---
 export default function GroceriesDashboardPage() {
+  // --- State Hooks ---
   const [lists, setLists] = useState<GroceryList[]>(MOCK_DATA);
   const [activeListId, setActiveListId] = useState<string>('list1');
   const [newItemName, setNewItemName] = useState('');
 
+  // --- Helper: Find the currently active list ---
   const activeList = lists.find((list) => list.id === activeListId);
 
+  // --- Event Handlers ---
+
+  /**
+   * Toggles the 'purchased' status of an item in the active list.
+   */
   const handleToggleItem = (itemId: string) => {
     setLists(
       lists.map((list) =>
@@ -60,12 +68,15 @@ export default function GroceriesDashboardPage() {
     );
   };
 
+  /**
+   * Adds a new item to the active list.
+   */
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName.trim() || !activeList) return;
 
     const newItem: GroceryItem = {
-      id: `item-${Date.now()}`,
+      id: `item-${Date.now()}`, // Simple unique ID
       name: newItemName.trim(),
       purchased: false,
     };
@@ -73,13 +84,16 @@ export default function GroceriesDashboardPage() {
     setLists(
       lists.map((list) =>
         list.id === activeListId
-          ? { ...list, items: [...list.items, newItem] }
+          ? { ...list, items: [newItem, ...list.items] } // Add to top
           : list
       )
     );
-    setNewItemName('');
+    setNewItemName(''); // Clear input field
   };
 
+  /**
+   * Deletes an item from the active list.
+   */
   const handleDeleteItem = (itemId: string) => {
     setLists(
       lists.map((list) =>
@@ -93,14 +107,16 @@ export default function GroceriesDashboardPage() {
     );
   };
 
+  // --- Render ---
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Header */}
+    // Container is now full-width, letting parent layout control padding
+    <div className="w-full">
+      {/* 1. Header */}
       <h1 className="text-4xl font-extrabold text-gray-800 mb-6">
         My Groceries
       </h1>
 
-      {/* Tabbed List Navigation */}
+      {/* 2. Tabbed List Navigation */}
       <div className="flex items-center border-b border-gray-200 mb-6">
         {lists.map((list) => (
           <button
@@ -124,34 +140,34 @@ export default function GroceriesDashboardPage() {
         </button>
       </div>
 
-      {/* Add New Item Form */}
+      {/* 3. Add New Item Form */}
       <form onSubmit={handleAddItem} className="flex gap-3 mb-6">
         <input
           type="text"
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
-          placeholder="e.g., 2% Milk"
+          placeholder="E.g., 2% Milk"
           className="flex-1 px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                      focus:outline-none focus:ring-2 focus:ring-green-500"
         />
         <button
           type="submit"
           className="px-6 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md 
-                     hover:bg-green-700 focus:outline-none focus:ring-2 cursor-pointer
-                     focus:ring-green-500 focus:ring-offset-2"
+                     hover:bg-green-700 focus:outline-none focus:ring-2 
+                     focus:ring-green-500 focus:ring-offset-2 cursor-pointer"
         >
           Add
         </button>
       </form>
 
-      {/* Active Grocery List Items */}
-      <div className="bg-white p-6 rounded-lg shadow-lg">
-        <ul className="space-y-4">
+      {/* 4. Active Grocery List Items */}
+      <div className="bg-white rounded-lg overflow-hidden">
+        <ul className="divide-y divide-gray-200">
           {activeList && activeList.items.length > 0 ? (
             activeList.items.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center p-3 rounded-lg transition-all 
+                className="flex items-center px-6 py-4 transition-all 
                            hover:bg-gray-50"
               >
                 <input
@@ -162,14 +178,15 @@ export default function GroceriesDashboardPage() {
                              focus:ring-green-500 cursor-pointer"
                 />
                 <span
-                  className={`ml-4 text-lg text-gray-700
+                  className={`ml-4 text-lg text-gray-800
                     ${item.purchased ? 'line-through text-gray-400' : ''}`}
                 >
                   {item.name}
                 </span>
                 <button
                   onClick={() => handleDeleteItem(item.id)}
-                  className="ml-auto text-gray-400 hover:text-red-500 font-bold text-xl cursor-pointer"
+                  className="ml-auto text-gray-400 hover:text-red-500 font-bold text-xl 
+                             opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
                   aria-label="Delete item"
                 >
                   &times;
@@ -177,7 +194,7 @@ export default function GroceriesDashboardPage() {
               </li>
             ))
           ) : (
-            <p className="text-center text-gray-500">
+            <p className="text-center text-gray-500 p-10">
               No items in this list yet.
             </p>
           )}
