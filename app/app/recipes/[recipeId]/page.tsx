@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { useModal } from '@/hooks/use-modal-store';
 
 interface Ingredient {
   id?: string;
@@ -37,6 +38,7 @@ export default function RecipeDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
+  const { onOpen } = useModal();
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,10 +81,10 @@ export default function RecipeDetailPage() {
   }, [params.recipeId, user, API_URL]);
 
   const handleAddToList = (ingredients: Ingredient[]) => {
-    const itemsToAdd = ingredients
-      .map((ing) => `${ing.name} (${ing.amount || ing.quantity})`)
-      .join('\n');
-    alert(`Items to be added to your grocery list:\n${itemsToAdd}`);
+    onOpen('addToList', { 
+      recipeIngredients: ingredients,
+      user: user 
+    });
   };
 
   const handleEdit = () => {
@@ -94,26 +96,21 @@ export default function RecipeDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (
-      !recipe ||
-      !window.confirm(`Are you sure you want to delete "${recipe.name}"?`)
-    ) {
-      return;
-    }
+    if (!recipe) return;
 
-    try {
-      const res = await fetch(`${API_URL}/api/recipes/${recipe.id}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        throw new Error('Failed to delete recipe on the server.');
+    onOpen('deleteConfirm', {
+      title: `Delete "${recipe.name}"?`,
+      description: 'This recipe will be permanently deleted.',
+      onConfirm: async () => {
+        const res = await fetch(`${API_URL}/api/recipes/${recipe.id}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          throw new Error('Failed to delete recipe on the server.');
+        }
+        router.replace('/app/recipes');
       }
-      alert('Recipe deleted successfully.');
-      router.replace('/app/recipes');
-    } catch (err: any) {
-      console.error('Failed to delete recipe:', err);
-      alert(`Error: ${err.message}`);
-    }
+    });
   };
 
   if (isLoading) {

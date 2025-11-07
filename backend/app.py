@@ -1,11 +1,11 @@
+from firebase_admin import firestore
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import ast
+from google.api_core import exceptions
+from datetime import datetime # Import datetime to handle the conversion
 
 from scraper.scrapers import get_food_prices
-from scraper.scrapers import get_walmart_prices, get_target_prices, get_kroger_prices
-from firebase_admin import firestore
-import ast
-
 from firebase_setup import db
 import recipe_functions
 
@@ -22,18 +22,12 @@ def home():
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
-    """
-    Creates a new user document.
-    EXPECTS: { "email": "...", "uid": "..." } from the frontend.
-    The 'uid' MUST match the Firebase Auth UID.
-    """
     try:
         data = request.get_json()
         uid = data.get('uid')
         if not uid:
             return jsonify({"error": "Missing 'uid' in request"}), 400
         
-        # Create the doc using the UID as the ID
         doc_ref = db.collection("users").document(uid)
         
         new_user_data = {
@@ -43,7 +37,7 @@ def create_user():
             'createdAt': firestore.SERVER_TIMESTAMP
         }
         
-        doc_ref.set(new_user_data) # Use .set() to create
+        doc_ref.set(new_user_data)
         return jsonify({"id": uid}), 201
         
     except Exception as e:
@@ -51,18 +45,22 @@ def create_user():
 
 @app.route('/api/users/<user_id>', methods=['GET'])
 def get_user(user_id):
-    # This route is fine, it fetches a single user doc
     try:
         doc = db.collection('users').document(user_id).get()
-        if doc.exists:
-            return jsonify(doc.to_dict())
-        return jsonify({'error': 'User not found'}), 404
+        if not doc.exists:
+            return jsonify({'error': 'User not found'}), 404
+            
+        user_data = doc.to_dict()
+        
+        if 'createdAt' in user_data and isinstance(user_data['createdAt'], datetime):
+            user_data['createdAt'] = user_data['createdAt'].isoformat()
+            
+        return jsonify(user_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/users/<user_id>', methods=['PATCH'])
 def update_user(user_id):
-    # This route is fine, it updates a single user doc
     try:
         data = request.get_json()
         doc_ref = db.collection("users").document(user_id)
@@ -75,88 +73,128 @@ def update_user(user_id):
 
 ######################################################
 # CRUD for Lists
-# /api/lists
-# /api/lists/<list_id>
 ######################################################
 
 @app.route('/api/lists', methods=['POST'])
 def create_list():
-    """ Creates a new list document in the top-level /lists collection. """
     try:
-        data = request.get_json() # e.g., { "listName": "New List", "ownerId": "..." }
+        data = request.get_json()
         data['createdAt'] = firestore.SERVER_TIMESTAMP
         
         doc_ref = db.collection("lists").add(data)
-        return jsonify({"id": doc_ref[1].id}), 201
+        new_list = doc_ref[1].get().to_dict()
+        new_list['id'] = doc_ref[1].id
+        if 'createdAt' in new_list and isinstance(new_list['createdAt'], datetime):
+            new_list['createdAt'] = new_list['createdAt'].isoformat()
+            
+        return jsonify(new_list), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/lists', methods=['GET'])
 def get_user_lists():
-    """ Gets all lists for a user. """
     try:
-        # Get user ID from query param: /api/lists?userId=abc
         user_id = request.args.get('userId') 
         if not user_id:
             return jsonify({"error": "Missing 'userId' query parameter"}), 400
 
         lists = []
-        # Query the /lists collection for docs where 'ownerId' matches
-        docs = db.collection('lists').where('ownerId', '==', user_id).stream()
+        
+        docs = db.collection('lists') \
+                 .where('ownerId', '==', user_id) \
+                 .order_by("createdAt", direction=firestore.Query.DESCENDING) \
+                 .stream()
+
         for doc in docs:
             list_data = doc.to_dict()
             list_data['id'] = doc.id
+            if 'createdAt' in list_data and isinstance(list_data['createdAt'], datetime):
+                list_data['createdAt'] = list_data['createdAt'].isoformat()
+            
             lists.append(list_data)
         return jsonify(lists), 200
+    
+    except exceptions.FailedPrecondition as e:
+        print(f"!!! MISSING INDEX: {e.message}")
+        return jsonify({"error": "Database index error. Check backend console."}), 500
     except Exception as e:
+        print(f"An error occurred in get_user_lists: {repr(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/lists/<list_id>', methods=['DELETE'])
 def delete_list(list_id):
-    """ Deletes a single list document. """
     try:
         db.collection("lists").document(list_id).delete()
         return ('', 204)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/lists/<list_id>', methods=['PATCH'])
+def update_list(list_id):
+    """ Updates a single list document (e.g., changes its name). """
+    try:
+        data = request.get_json() # e.g., { "name": "New List Name" }
+        
+        doc_ref = db.collection("lists").document(list_id)
+        
+        if not doc_ref.get().exists:
+            return jsonify({"error": "List not found"}), 404
+            
+        doc_ref.update(data)
+        return jsonify({"message": "List updated"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 ######################################################
 # CRUD for List Items
-# /api/lists/<list_id>/items
-# /api/lists/<list_id>/items/<item_id>
 ######################################################
 
 @app.route('/api/lists/<list_id>/items', methods=['POST'])
 def create_list_item(list_id):
-    """ Creates a new item document in a list's /items subcollection. """
     try:
-        data = request.get_json() # e.g., { "name": "Milk", "purchased": false }
+        data = request.get_json()
+        data['createdAt'] = firestore.SERVER_TIMESTAMP
         
-        # Add the item to the subcollection
         doc_ref = db.collection("lists").document(list_id).collection("items").add(data)
-        return jsonify({"id": doc_ref[1].id}), 201
+        new_item = doc_ref[1].get().to_dict()
+        new_item['id'] = doc_ref[1].id
+        if 'createdAt' in new_item and isinstance(new_item['createdAt'], datetime):
+            new_item['createdAt'] = new_item['createdAt'].isoformat()
+            
+        return jsonify(new_item), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/lists/<list_id>/items', methods=['GET'])
 def get_list_items(list_id):
-    """ Gets all items from a list's /items subcollection. """
     try:
         items = []
-        docs = db.collection("lists").document(list_id).collection("items").stream()
+        docs = db.collection("lists") \
+                 .document(list_id) \
+                 .collection("items") \
+                 .order_by("createdAt", direction=firestore.Query.DESCENDING) \
+                 .stream()
+        
         for doc in docs:
             item_data = doc.to_dict()
             item_data['id'] = doc.id
+            if 'createdAt' in item_data and isinstance(item_data['createdAt'], datetime):
+                item_data['createdAt'] = item_data['createdAt'].isoformat()
+            
             items.append(item_data)
         return jsonify(items), 200
+    
+    except exceptions.FailedPrecondition as e:
+        print(f"!!! MISSING INDEX: {e.message}")
+        return jsonify({"error": "Database index error. Check backend console."}), 500
     except Exception as e:
+        print(f"An error occurred in get_list_items: {repr(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/lists/<list_id>/items/<item_id>', methods=['PATCH'])
 def update_list_item(list_id, item_id):
-    """ Updates a single item document in a subcollection. """
     try:
-        data = request.get_json() # e.g., { "purchased": true }
+        data = request.get_json()
         doc_ref = db.collection("lists").document(list_id).collection("items").document(item_id)
         doc_ref.update(data)
         return jsonify({"message": "Item updated"}), 200
@@ -165,7 +203,6 @@ def update_list_item(list_id, item_id):
 
 @app.route('/api/lists/<list_id>/items/<item_id>', methods=['DELETE'])
 def delete_list_item(list_id, item_id):
-    """ Deletes a single item document from a subcollection. """
     try:
         doc_ref = db.collection("lists").document(list_id).collection("items").document(item_id)
         doc_ref.delete()
@@ -175,57 +212,73 @@ def delete_list_item(list_id, item_id):
 
 ####################################################### 
 # CRUD for Recipes
-# /api/recipes
-# /api/recipes/<recipe_id>
 #######################################################
 
 @app.route('/api/recipes', methods=['POST'])
 def create_recipe():
-    """ Creates a new recipe document in the top-level /recipes collection. """
     try:
-        data = request.get_json() # e.g., { "name": "...", "ingredients": [...], "ownerId": "..." }
+        data = request.get_json()
         data['createdAt'] = firestore.SERVER_TIMESTAMP
         
         doc_ref = db.collection("recipes").add(data)
-        return jsonify({"id": doc_ref[1].id}), 201
+
+        # --- FIX ---
+        new_recipe = doc_ref[1].get().to_dict()
+        new_recipe['id'] = doc_ref[1].id
+        if 'createdAt' in new_recipe and isinstance(new_recipe['createdAt'], datetime):
+            new_recipe['createdAt'] = new_recipe['createdAt'].isoformat()
+
+        return jsonify(new_recipe), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/recipes', methods=['GET'])
 def get_user_recipes():
-    """ Gets all recipes for a user. """
     try:
-        # Get user ID from query param: /api/recipes?userId=abc
         user_id = request.args.get('userId')
         if not user_id:
             return jsonify({"error": "Missing 'userId' query parameter"}), 400
         
         recipes = []
-        docs = db.collection('recipes').where('ownerId', '==', user_id).stream()
+        docs = db.collection('recipes') \
+                 .where('ownerId', '==', user_id) \
+                 .order_by("createdAt", direction=firestore.Query.DESCENDING) \
+                 .stream()
+                 
         for doc in docs:
             recipe_data = doc.to_dict()
             recipe_data['id'] = doc.id
+            if 'createdAt' in recipe_data and isinstance(recipe_data['createdAt'], datetime):
+                recipe_data['createdAt'] = recipe_data['createdAt'].isoformat()
+            
             recipes.append(recipe_data)
         return jsonify(recipes), 200
+        
+    except exceptions.FailedPrecondition as e:
+        print(f"!!! MISSING INDEX (Recipes): {e.message}")
+        return jsonify({"error": "Database index error. Check backend console."}), 500
     except Exception as e:
+        print(f"An error occurred in get_user_recipes: {repr(e)}")
         return jsonify({"error": str(e)}), 500
-    
+
 @app.route('/api/recipes/<recipe_id>', methods=['GET'])
 def get_recipe(recipe_id):
-    """ Gets a single recipe document by its ID. """
     try:
         doc = db.collection('recipes').document(recipe_id).get()
-        if doc.exists:
-            recipe_data = doc.to_dict()
-            recipe_data['id'] = doc.id
-            return jsonify(recipe_data)
-        return jsonify({'error': 'Recipe not found'}), 404
+        if not doc.exists:
+            return jsonify({'error': 'Recipe not found'}), 404
+            
+        recipe_data = doc.to_dict()
+        recipe_data['id'] = doc.id
+        if 'createdAt' in recipe_data and isinstance(recipe_data['createdAt'], datetime):
+            recipe_data['createdAt'] = recipe_data['createdAt'].isoformat()
+            
+        return jsonify(recipe_data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/recipes/<recipe_id>', methods=['PATCH'])
 def update_recipe_route(recipe_id):
-    """ Updates a single recipe document. """
     try:
         data = request.get_json()
         recipe_functions.update_recipe(recipe_id, data)
@@ -235,7 +288,6 @@ def update_recipe_route(recipe_id):
 
 @app.route('/api/recipes/<recipe_id>', methods=['DELETE'])
 def delete_recipe_route(recipe_id):
-    """ Deletes a single recipe document. """
     try:
         recipe_functions.delete_recipe(recipe_id)
         return ('', 204)

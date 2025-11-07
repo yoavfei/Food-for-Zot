@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react'; // No useEffect for fetching initial data
+import { useRouter } from 'next/navigation'; // No useParams for recipeId
 import {
   Plus,
   Trash2,
   ChevronLeft,
   Save,
   Image as ImageIcon,
-  Clock, // Import Clock icon
+  Clock,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { toast } from 'react-hot-toast';
 
 interface IngredientField {
   id: string;
@@ -18,21 +20,32 @@ interface IngredientField {
   quantity: string;
 }
 
-export default function NewRecipePage() {
-  const router = useRouter();
-  const { user } = useAuth();
+// No need for RecipeData interface here as we're creating, not loading
+// interface RecipeData { ... }
 
+export default function CreateRecipePage() { // Renamed component
+  const router = useRouter();
+  const { user } = useAuth(); // We need the user for ownerId
+
+  // --- Initial State (all blank for new recipe) ---
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [prepTime, setPrepTime] = useState(''); // New State
-  const [cookTime, setCookTime] = useState(''); // New State
+  const [prepTime, setPrepTime] = useState('');
+  const [cookTime, setCookTime] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [ingredients, setIngredients] = useState<IngredientField[]>([
     { id: '1', name: '', quantity: '' },
   ]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // No isLoading state needed for creation page
+  // const [isLoading, setIsLoading] = useState(true); 
 
   const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  // --- No useEffect for fetching data needed for a new recipe page ---
+  // useEffect(() => { ... }, [...]);
 
   const handleIngredientChange = (
     id: string,
@@ -60,71 +73,83 @@ export default function NewRecipePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) {
-      alert('You must be logged in to create a recipe.');
+      toast.error('You must be logged in to create a recipe.');
+      return;
+    }
+
+    // Basic validation
+    if (!name.trim() || !instructions.trim()) {
+      toast.error('Recipe name and instructions are required.');
       return;
     }
 
     setIsSubmitting(true);
 
-    const finalIngredients = ingredients.map(({ name, quantity }) => ({
-      name: name,
-      amount: quantity,
-    }));
+    const finalIngredients = ingredients
+      .filter(ing => ing.name.trim() !== '' || ing.quantity.trim() !== '') // Filter out empty ingredient rows
+      .map(({ name, quantity }) => ({
+        name: name.trim(),
+        amount: quantity.trim(),
+      }));
 
     const recipeData = {
-      name,
-      description,
-      imageUrl: imageUrl || '',
-      prepTime: prepTime || '', // Add to data
-      cookTime: cookTime || '', // Add to data
+      name: name.trim(),
+      description: description.trim(),
+      imageUrl: imageUrl.trim(),
+      instructions: instructions.trim(),
+      prepTime: prepTime.trim(),
+      cookTime: cookTime.trim(),
       ingredients: finalIngredients,
-      ownerId: user.uid,
+      ownerId: user.uid, // Crucial: Add ownerId
     };
 
-    try {
-      const res = await fetch(`${API_URL}/api/recipes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recipeData),
-      });
-
+    const promise = fetch(`${API_URL}/api/recipes`, { // POST to /api/recipes (no ID)
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recipeData),
+    }).then(async (res) => { // Must await res.json() to get new ID
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(
-          errorData.error || 'Failed to save recipe on the server.'
-        );
+        throw new Error(errorData.error || 'Failed to create recipe.');
       }
+      return res.json(); // Get the new recipe data, including its ID
+    });
 
-      alert('Recipe saved successfully!');
-      router.push('/app/recipes');
-    } catch (err: any) {
-      console.error('Error saving recipe:', err);
-      alert(`An error occurred: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    toast.promise(
+      promise,
+      {
+        loading: 'Creating recipe...',
+        success: (newRecipe) => {
+          router.push(`/app/recipes/${newRecipe.id}`); // Redirect to new recipe's detail page
+          return 'Recipe created successfully!';
+        },
+        error: (err) => err.message,
+      }
+    ).finally(() => setIsSubmitting(false));
   };
+
+  // No isLoading state, so no special render needed here
+  // if (isLoading) { ... }
 
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit}>
-        {/* 1. Page Header */}
+        {/* Page Header (modified title and back button behavior) */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <button
               type="button"
               onClick={() => router.back()}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 
-                     font-semibold transition-all mb-4"
+                               font-semibold transition-all mb-4"
               title="Go Back"
             >
               <ChevronLeft className="h-5 w-5" />
               Go Back
             </button>
             <h1 className="text-5xl font-extrabold text-gray-800">
-              Create New Recipe
+              Edit Recipe
             </h1>
           </div>
           <button
@@ -136,11 +161,11 @@ export default function NewRecipePage() {
                        focus:ring-offset-2 transition-all disabled:bg-gray-400"
           >
             <Save className="h-5 w-5" />
-            {isSubmitting ? 'Saving...' : 'Save Recipe'}
+            {isSubmitting ? 'Creating...' : 'Create Recipe'}
           </button>
         </div>
 
-        {/* 2. Two-Column Layout */}
+        {/* Two-Column Layout (same as edit page) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Main Details */}
           <div className="lg:col-span-2 bg-white p-8 rounded-2xl shadow-lg border border-gray-100 space-y-6">
@@ -163,22 +188,42 @@ export default function NewRecipePage() {
               />
             </div>
 
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-bold text-gray-700 mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                placeholder="A short, catchy description of your recipe..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
-                           focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  placeholder="A short, catchy description of your recipe..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label
+                  htmlFor="instructions"
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Instructions
+                </label>
+                <textarea
+                  id="instructions"
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  rows={4}
+                  placeholder="1. Chop vegetables...&#10;2. Sauté onions...&#10;3. Add broth..."
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
             </div>
 
             <div>
@@ -198,11 +243,13 @@ export default function NewRecipePage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                              focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <ImageIcon
+                  className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                  aria-hidden="true"
+                />
               </div>
             </div>
 
-            {/* --- NEW TIME INPUTS --- */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label
@@ -221,7 +268,10 @@ export default function NewRecipePage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                                focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Clock
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
               <div className="flex-1">
@@ -241,20 +291,22 @@ export default function NewRecipePage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                                focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Clock
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
             </div>
-            {/* --- END OF NEW INPUTS --- */}
           </div>
 
-          {/* Right Column: Ingredients */}
+          {/* Right Column: Ingredients (unchanged) */}
           <div className="lg:col-span-1 bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
               Ingredients
             </h2>
             <div className="space-y-4">
-              {ingredients.map((ing, index) => (
+              {ingredients.map((ing) => ( // No index needed if using unique ID
                 <div key={ing.id} className="flex items-center gap-2">
                   <input
                     type="text"

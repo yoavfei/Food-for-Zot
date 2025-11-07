@@ -12,6 +12,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { toast } from 'react-hot-toast';
 
 interface IngredientField {
   id: string;
@@ -42,6 +43,7 @@ export default function EditRecipePage() {
   const [imageUrl, setImageUrl] = useState('');
   const [prepTime, setPrepTime] = useState('');
   const [cookTime, setCookTime] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [ingredients, setIngredients] = useState<IngredientField[]>([
     { id: '1', name: '', quantity: '' },
   ]);
@@ -63,7 +65,7 @@ export default function EditRecipePage() {
         const data: RecipeData = await res.json();
 
         if (data.ownerId !== user.uid) {
-          alert("You don't have permission to edit this recipe.");
+          toast.error("You don't have permission to edit this recipe.");
           router.replace('/app/recipes');
           return;
         }
@@ -73,6 +75,7 @@ export default function EditRecipePage() {
         setImageUrl(data.imageUrl || '');
         setPrepTime(data.prepTime || '');
         setCookTime(data.cookTime || '');
+        setInstructions(data.instructions || '');
         setIngredients(
           data.ingredients.length > 0
             ? data.ingredients.map((ing, i) => ({
@@ -82,9 +85,9 @@ export default function EditRecipePage() {
             }))
             : [{ id: '1', name: '', quantity: '' }]
         );
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        alert('Failed to load recipe data.');
+        toast.error(err.message || 'Failed to load recipe data.');
         router.push('/app/recipes');
       } finally {
         setIsLoading(false);
@@ -133,31 +136,31 @@ export default function EditRecipePage() {
       name,
       description,
       imageUrl,
+      instructions,
       prepTime,
       cookTime,
       ingredients: finalIngredients,
     };
 
-    try {
-      const res = await fetch(`${API_URL}/api/recipes/${recipeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recipeData),
-      });
+    const promise = fetch(`${API_URL}/api/recipes/${recipeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(recipeData),
+    }).then((res) => {
+      if (!res.ok) throw new Error('Failed to update recipe.');
+    });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to update recipe.');
+    toast.promise(
+      promise,
+      {
+        loading: 'Saving changes...',
+        success: (data) => {
+          router.push(`/app/recipes/${recipeId}`);
+          return 'Recipe updated successfully!';
+        },
+        error: (err) => err.message,
       }
-
-      alert('Recipe updated successfully!');
-      router.push('/app/recipes');
-    } catch (err: any) {
-      console.error('Error updating recipe:', err);
-      alert(`An error occurred: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    ).finally(() => setIsSubmitting(false));
   };
 
   if (isLoading) {
@@ -171,7 +174,7 @@ export default function EditRecipePage() {
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit}>
-        {/* 1. Page Header */}
+        {/* Page Header (unchanged) */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <button
@@ -201,7 +204,7 @@ export default function EditRecipePage() {
           </button>
         </div>
 
-        {/* 2. Two-Column Layout */}
+        {/* Two-Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column: Main Details */}
           <div className="lg:col-span-2 bg-white p-8 rounded-2xl shadow-lg border border-gray-100 space-y-6">
@@ -224,23 +227,45 @@ export default function EditRecipePage() {
               />
             </div>
 
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-bold text-gray-700 mb-2"
-              >
-                Description
-              </label>
-              <textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                placeholder="A short, catchy description of your recipe..."
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
-                           focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+            {/* --- NEW LAYOUT FOR DESCRIPTION AND INSTRUCTIONS --- */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label
+                  htmlFor="description"
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4} // Reduced rows to fit side-by-side
+                  placeholder="A short, catchy description of your recipe..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label
+                  htmlFor="instructions"
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Instructions
+                </label>
+                <textarea
+                  id="instructions"
+                  value={instructions}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  rows={4} // Reduced rows to fit side-by-side
+                  placeholder="1. Chop vegetables...&#10;2. Sauté onions...&#10;3. Add broth..."
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
+                             focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
             </div>
+            {/* --- END NEW LAYOUT --- */}
 
             <div>
               <label
@@ -316,7 +341,7 @@ export default function EditRecipePage() {
             </div>
           </div>
 
-          {/* Right Column: Ingredients */}
+          {/* Right Column: Ingredients (unchanged) */}
           <div className="lg:col-span-1 bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
               Ingredients

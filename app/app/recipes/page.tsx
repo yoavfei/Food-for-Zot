@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { useModal } from '@/hooks/use-modal-store';
 
 interface Ingredient {
   id?: string;
@@ -34,7 +35,7 @@ interface Recipe {
 }
 
 const LoadingState = () => (
-  <div className="flex justify-center items-center p-12 mt-10">
+  <div className="flex justify-center items-center w-full h-full">
     <Loader2 className="h-16 w-16 text-green-600 animate-spin" />
   </div>
 );
@@ -74,6 +75,7 @@ export default function MyRecipesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
+  const { onOpen, refetchId, triggerRefetch } = useModal();
   const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -101,53 +103,33 @@ export default function MyRecipesPage() {
     fetchRecipes();
   }, [user]);
 
-  const handleAddToList = async (recipe: Recipe) => {
-    const itemsToAdd = recipe.ingredients.map((ing) => ({
-      name: `${ing.name} (${ing.amount || ing.quantity})`,
-      purchased: false,
-    }));
-
-    alert(
-      `Mock Add: Adding ${itemsToAdd.length} items to your grocery list.`
-    );
-
-    try {
-      const listId = 'YOUR_ACTIVE_LIST_ID';
-      await Promise.all(
-        itemsToAdd.map(item =>
-          fetch(`${API_URL}/api/lists/${listId}/items`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(item),
-          })
-        )
-      );
-    } catch (err) {
-      console.error('Failed to add items to list:', err);
-      alert('Error: Could not add items to list.');
-    }
+  const handleAddToList = (recipe: Recipe) => {
+    onOpen('addToList', {
+      recipeIngredients: recipe.ingredients,
+      user: user
+    });
   };
 
-  const handleDelete = async (recipeId: string) => {
-    if (!window.confirm('Are you sure you want to delete this recipe?')) {
-      return;
-    }
+  // 5. Update handleDelete to use the modal
+  const handleDelete = (recipeId: string, recipeName: string) => {
+    onOpen('deleteConfirm', {
+      title: `Delete "${recipeName}"?`,
+      description: 'This recipe will be permanently deleted and cannot be recovered.',
+      onConfirm: () => {
+        setRecipes((currentRecipes) =>
+          currentRecipes.filter((r) => r.id !== recipeId)
+        );
 
-    const originalRecipes = [...recipes];
-    setRecipes(recipes.filter((r) => r.id !== recipeId));
-
-    try {
-      const res = await fetch(`${API_URL}/api/recipes/${recipeId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        throw new Error('Failed to delete on server.');
+        return fetch(`${API_URL}/api/recipes/${recipeId}`, {
+          method: 'DELETE',
+        }).then((res) => {
+          if (!res.ok) {
+            triggerRefetch();
+            throw new Error('Failed to delete on server.');
+          }
+        });
       }
-    } catch (err) {
-      console.error('Failed to delete recipe:', err);
-      alert('Error: Could not delete recipe. Restoring list.');
-      setRecipes(originalRecipes);
-    }
+    });
   };
 
   const handleEdit = (recipeId: string) => {
@@ -158,10 +140,15 @@ export default function MyRecipesPage() {
     router.push(`/app/recipes/${recipeId}`);
   }
 
+  if (isLoading) {
+    return (
+      <div className='flex items-center justify-center w-full h-full'>
+        <LoadingState />
+      </div>
+    );
+  }
+
   const renderContent = () => {
-    if (isLoading) {
-      return <LoadingState />;
-    }
     if (error) {
       return <ErrorState message={error} />;
     }
@@ -200,7 +187,8 @@ export default function MyRecipesPage() {
             <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
               <button
                 onClick={() => handleAddToList(recipe)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 rounded-lg hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 
+                rounded-lg hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
               >
                 <ClipboardPlus className="h-4 w-4" />
                 Add to List
@@ -215,7 +203,7 @@ export default function MyRecipesPage() {
                   <Pencil className="h-5 w-5" />
                 </button>
                 <button
-                  onClick={() => handleDelete(recipe.id)}
+                  onClick={() => handleDelete(recipe.id, recipe.name)}
                   className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-gray-200 transition-all"
                   title="Delete Recipe"
                 >
@@ -231,7 +219,7 @@ export default function MyRecipesPage() {
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-12">
         <h1 className="text-4xl font-extrabold text-gray-800">My Recipes</h1>
         <Link
           href="/app/recipes/new"
