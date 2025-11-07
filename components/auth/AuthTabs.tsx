@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { auth } from '../../lib/firebase';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   User,
 } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 
 const navigateTo = (path: string) => {
   if (typeof window !== 'undefined') {
@@ -21,6 +23,15 @@ export default function AuthTabs() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/app');
+    }
+  }, [user, authLoading, router]);
 
   const createUserDocumentInDb = async (token: string, user: User) => {
     await fetch('/api/users', {
@@ -93,10 +104,9 @@ export default function AuthTabs() {
             setError(null);
           }}
           className={`py-3 px-4 rounded-md text-sm font-semibold transition-all duration-200
-            ${
-              isLogin
-                ? 'bg-white text-green-700 shadow-sm'
-                : 'text-gray-600 hover:bg-gray-200'
+            ${isLogin
+              ? 'bg-white text-green-700 shadow-sm'
+              : 'text-gray-600 hover:bg-gray-200'
             }`}
         >
           Login
@@ -107,10 +117,9 @@ export default function AuthTabs() {
             setError(null);
           }}
           className={`py-3 px-4 rounded-md text-sm font-semibold transition-all duration-200
-            ${
-              !isLogin
-                ? 'bg-white text-green-700 shadow-sm'
-                : 'text-gray-600 hover:bg-gray-200'
+            ${!isLogin
+              ? 'bg-white text-green-700 shadow-sm'
+              : 'text-gray-600 hover:bg-gray-200'
             }`}
         >
           Sign Up

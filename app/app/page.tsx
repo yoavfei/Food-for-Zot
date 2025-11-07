@@ -110,7 +110,7 @@ export default function GroceriesDashboardPage() {
   // --- Render ---
   return (
     // Container is now full-width, letting parent layout control padding
-    <div className="w-full">
+    <div className="w-full bg-background/95">
       {/* 1. Header */}
       <h1 className="text-4xl font-extrabold text-gray-800 mb-6">
         My Groceries
@@ -147,7 +147,7 @@ export default function GroceriesDashboardPage() {
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
           placeholder="E.g., 2% Milk"
-          className="flex-1 px-4 py-3 border border-gray-300 rounded-lg shadow-sm 
+          className="flex-1 px-4 py-3 border bg-white border-gray-300 rounded-lg shadow-sm 
                      focus:outline-none focus:ring-2 focus:ring-green-500"
         />
         <button
@@ -161,7 +161,7 @@ export default function GroceriesDashboardPage() {
       </form>
 
       {/* 4. Active Grocery List Items */}
-      <div className="bg-white rounded-lg overflow-hidden">
+      <div className="rounded-lg overflow-hidden">
         <ul className="divide-y divide-gray-200">
           {activeList && activeList.items.length > 0 ? (
             activeList.items.map((item) => (
@@ -174,7 +174,7 @@ export default function GroceriesDashboardPage() {
                   type="checkbox"
                   checked={item.purchased}
                   onChange={() => handleToggleItem(item.id)}
-                  className="h-6 w-6 text-green-600 border-gray-300 rounded 
+                  className="h-6 w-6 text-green-600 rounded 
                              focus:ring-green-500 cursor-pointer"
                 />
                 <span
