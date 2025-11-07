@@ -1,8 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { useRouter } from 'next/navigation';
 import {
-  ShoppingCart,
   ArrowRight,
   Sparkles,
   DollarSign,
@@ -20,26 +20,21 @@ import {
 
 const CONTENT = {
   branding: {
-    name: "SmartCart",
+    name: "Food for Zot",
     tagline: "Built for UC Irvine Students",
   },
   hero: {
-    title: "Smart Grocery Shopping",
+    title: "Grocery Shopping",
     titleHighlight: "Made Simple",
     subtitle:
-      "Get personalized grocery recommendations, budget-friendly meal plans, and store comparisons—all tailored for college students.",
-    stats: [
-      { value: "$50+", label: "Average monthly savings" },
-      { value: "500+", label: "UCI students using SmartCart" },
-      { value: "3 min", label: "Average time to find best deals" },
-    ],
+      "Get personalized grocery recommendations, budget-friendly meal plans, and more. Built for UCI students by UCI students.",
   },
   features: [
     {
       icon: DollarSign,
-      title: "Budget Tracking",
-      description:
-        "Stay within your grocery budget with smart spending insights and price alerts for your favorite items.",
+        title: "Grocery List",
+        description:
+            "Stay within your grocery budget with smart spending insights and price alerts for your favorite items.",
     },
     {
       icon: TrendingDown,
@@ -62,7 +57,7 @@ const CONTENT = {
       icon: Search,
       number: "01",
       title: "Tell Us What You Need",
-      description: "Enter your dietary preferences, budget, and what you're craving this week.",
+      description: "Enter what you're craving this week.",
     },
     {
       icon: Zap,
@@ -79,7 +74,7 @@ const CONTENT = {
   ],
   cta: {
     title: "Ready to Save on Groceries?",
-    subtitle: "Join hundreds of UCI students who are already shopping smarter and saving money every week.",
+    subtitle: "Be the first of many UCI students to  shop smarter and save money every week.",
     disclaimer: "No credit card required • Takes less than 2 minutes",
   },
 }
@@ -87,38 +82,6 @@ const CONTENT = {
 // ============================================
 // COMPONENTS
 // ============================================
-
-function Header() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <ShoppingCart className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-xl font-bold text-foreground">{CONTENT.branding.name}</span>
-        </div>
-        <nav className="hidden items-center gap-6 md:flex">
-          <a
-            href="#features"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Features
-          </a>
-          <a
-            href="#how-it-works"
-            className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            How It Works
-          </a>
-          <Button size="sm" className="ml-2">
-            Get Started
-          </Button>
-        </nav>
-      </div>
-    </header>
-  )
-}
 
 function HeroSection() {
   return (
@@ -147,15 +110,6 @@ function HeroSection() {
               See How It Works
             </Button>
           </div>
-
-          <div className="mt-16 grid gap-8 sm:grid-cols-3">
-            {CONTENT.hero.stats.map((stat) => (
-              <div key={stat.label} className="rounded-lg border border-border/50 bg-card p-6">
-                <div className="mb-2 text-3xl font-bold text-primary">{stat.value}</div>
-                <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </section>
@@ -171,15 +125,16 @@ function FeaturesSection() {
             Everything You Need to Shop Smarter
           </h2>
           <p className="text-pretty text-lg leading-relaxed text-muted-foreground">
-            Powerful tools designed specifically for college students who want to eat well without breaking the bank.
+            Designed specifically for college students who want to eat well without going broke 🥀.
           </p>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-          {CONTENT.features.map((feature) => (
+    <div className="mx-auto max-w-4xl">
+        <div className="grid gap-8 grid-cols-1 md:grid-cols-2">
+            {CONTENT.features.map((feature) => (
             <div
-              key={feature.title}
-              className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/50 hover:shadow-lg"
+                key={feature.title}
+                className="group rounded-xl border border-border/50 bg-card p-6 transition-all hover:border-primary/50 hover:shadow-lg"
             >
               <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                 <feature.icon className="h-6 w-6" />
@@ -189,6 +144,7 @@ function FeaturesSection() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </section>
   )
@@ -232,6 +188,8 @@ function HowItWorksSection() {
 }
 
 function CTASection() {
+    const router = useRouter();
+
   return (
     <section className="py-20 sm:py-24">
       <div className="container mx-auto px-4">
@@ -240,7 +198,7 @@ function CTASection() {
             {CONTENT.cta.title}
           </h2>
           <p className="mb-8 text-pretty text-lg leading-relaxed text-muted-foreground">{CONTENT.cta.subtitle}</p>
-          <Button size="lg" className="group h-12 gap-2 px-8 text-base">
+          <Button size="lg" className="group h-12 gap-2 px-8 text-base" onClick={() => router.push('/login')}>
             Get Started Free
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Button>
@@ -258,7 +216,6 @@ function CTASection() {
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
-      <Header />
       <main>
         <HeroSection />
         <FeaturesSection />
