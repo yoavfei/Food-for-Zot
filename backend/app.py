@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from scraper.scrapers import get_walmart_prices, get_target_prices, get_kroger_prices
+from scraper.scrapers import get_food_prices
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for Next.js frontend
@@ -333,23 +333,25 @@ def get_prices():
     if not item:
         return jsonify({"error": "Missing 'grocery' query parameter"}), 400
 
-    results = {}
     try:
-        print(results, 'before')
-        results["walmart"] = get_walmart_prices(item)
-        print(results, 'walmart')
-        results["target"] = get_target_prices(item)
-        print(results, 'target')
-        results["kroger"] = get_kroger_prices(item)
-        print(results, 'kroger')
+        results = get_food_prices(item) 
+
+        res = {}
+        for store_name, items in results.items():
+            res[store_name] = []
+            for item in items[:1]:
+                product_name = item['Product Name']
+                latest_price = item['Price over time'][-1]['Price']
+                res[store_name].append({"name": product_name, "price": latest_price})
+
     except Exception as e:
-        results = {
-            "walmart": [{"name": "Eggs", "price": "$3.49"}],
-            "target": [{"name": "Eggs", "price": "$4.29"}],
-            "kroger": [{"name": "Eggs", "price": "$4.99"}],
+        res = {
+            "Walmart": [{"name": "Eggs", "price": "$3.49"}],
+            "Target": [{"name": "Eggs", "price": "$4.29"}],
+            "Kroger": [{"name": "Eggs", "price": "$4.99"}],
         }
 
-    return jsonify({"grocery": item, "results": results})
+    return jsonify({"grocery": item, "results": res})
 
 
 
