@@ -100,7 +100,7 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
           <h3 className="mb-1 text-xl font-semibold text-card-foreground">{result.storeName}</h3>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            <span>{result.location}</span>
+            <span>University Town Center, Irvine</span>
           </div>
         </div>
       </div>
