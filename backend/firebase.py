@@ -8,4 +8,3 @@ with open('./firebase.json', 'r') as f:
 cred = credentials.Certificate(FIREBASE_JSON)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
-# add a colletion
