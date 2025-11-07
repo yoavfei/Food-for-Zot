@@ -4,6 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from scraper.scrapers import get_walmart_prices, get_target_prices
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for Next.js frontend
@@ -321,6 +322,26 @@ def delete_recipe_list_item(user_id):
         return ('', 204)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+#######################################################
+# Web scrape for prices
+
+@app.route("/api/prices", methods=["GET"])
+def get_prices():
+    item = request.args.get("grocery")
+    if not item:
+        return jsonify({"error": "Missing 'grocery' query parameter"}), 400
+
+    results = {}
+    try:
+        results["walmart"] = get_walmart_prices(item)
+        results["target"] = get_target_prices(item)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"grocery": item, "results": results})
+
 
 
 if __name__ == "__main__":
