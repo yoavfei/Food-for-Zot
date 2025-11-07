@@ -1,82 +1,21 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ShoppingCart, Search, MapPin, TrendingUp, ArrowLeft } from "lucide-react"
-
-// ============================================
-// CONFIGURATION - Easy to modify
-// ============================================
-
-const CONTENT = {
-  branding: {
-    name: "Food For Zot",
-  },
-  search: {
-    placeholder: "Enter an ingredient (e.g., organic eggs, avocados)...",
-    emptyStateTitle: "Find the Best Grocery Prices",
-    emptyStateSubtitle: "Search for any ingredient to compare prices across stores near UCI campus",
-  },
-  // Mock data - replace with actual API call
-  mockResults: [
-    {
-      id: 1,
-      storeName: "Trader Joe's",
-      location: "University Center",
-      distance: "0.8 mi",
-      price: 3.49,
-      unit: "dozen",
-      inStock: true,
-      savings: 25,
-    },
-    {
-      id: 2,
-      storeName: "Ralphs",
-      location: "Campus Drive",
-      distance: "1.2 mi",
-      price: 4.29,
-      unit: "dozen",
-      inStock: true,
-      savings: 10,
-    },
-    {
-      id: 3,
-      storeName: "Target",
-      location: "Diamond Jamboree",
-      distance: "2.1 mi",
-      price: 4.99,
-      unit: "dozen",
-      inStock: true,
-      savings: 0,
-    },
-    {
-      id: 4,
-      storeName: "Whole Foods",
-      location: "The Market Place",
-      distance: "3.4 mi",
-      price: 5.99,
-      unit: "dozen",
-      inStock: false,
-      savings: 0,
-    },
-  ],
-}
 
 // ============================================
 // TYPES
 // ============================================
 
 interface StoreResult {
-  id: number
   storeName: string
   location: string
-  distance: string
   price: number
-  unit: string
-  inStock: boolean
-  savings: number
+  unit?: string
+  inStock?: boolean
+  savings?: number
+  distance?: string
 }
 
 // ============================================
@@ -91,7 +30,7 @@ function Header() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <ShoppingCart className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-semibold tracking-tight text-foreground">{CONTENT.branding.name}</span>
+          <span className="text-xl font-semibold tracking-tight text-foreground">Food For Zot</span>
         </a>
         <Button variant="ghost" size="sm" asChild>
           <a href="/" className="gap-2">
@@ -109,9 +48,7 @@ function SearchBar({ onSearch, isLoading }: { onSearch: (query: string) => void;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (query.trim()) {
-      onSearch(query.trim())
-    }
+    if (query.trim()) onSearch(query.trim())
   }
 
   return (
@@ -122,7 +59,7 @@ function SearchBar({ onSearch, isLoading }: { onSearch: (query: string) => void;
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={CONTENT.search.placeholder}
+          placeholder="Enter an ingredient (e.g., organic eggs, avocados)..."
           disabled={isLoading}
           className="h-16 w-full rounded-2xl border border-border/50 bg-card pl-16 pr-6 text-base font-medium text-foreground shadow-sm transition-all placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/10 disabled:opacity-50"
         />
@@ -137,8 +74,10 @@ function EmptyState() {
       <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
         <Search className="h-10 w-10 text-primary" />
       </div>
-      <h2 className="mb-3 text-2xl font-semibold text-foreground">{CONTENT.search.emptyStateTitle}</h2>
-      <p className="max-w-md text-pretty text-muted-foreground">{CONTENT.search.emptyStateSubtitle}</p>
+      <h2 className="mb-3 text-2xl font-semibold text-foreground">Find the Best Grocery Prices</h2>
+      <p className="max-w-md text-pretty text-muted-foreground">
+        Search for any ingredient to compare prices across stores near UCI campus
+      </p>
     </div>
   )
 }
@@ -155,24 +94,25 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
           Best Price
         </div>
       )}
-
       <div className="mb-5 flex items-start justify-between">
         <div>
           <h3 className="mb-1 text-xl font-semibold text-card-foreground">{result.storeName}</h3>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
             <span>{result.location}</span>
-            <span>•</span>
-            <span>{result.distance}</span>
+            {result.distance && (
+              <>
+                <span>•</span>
+                <span>{result.distance}</span>
+              </>
+            )}
           </div>
         </div>
       </div>
-
       <div className="flex items-baseline gap-2">
         <span className="text-4xl font-semibold text-foreground">${result.price.toFixed(2)}</span>
-        <span className="text-base text-muted-foreground">/ {result.unit}</span>
+        {result.unit && <span className="text-base text-muted-foreground">/ {result.unit}</span>}
       </div>
-
       <div className="mt-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {result.inStock ? (
@@ -186,16 +126,13 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
               Out of Stock
             </span>
           )}
-          {result.savings > 0 && (
+          {result.savings && result.savings > 0 && (
             <span className="inline-flex items-center gap-1 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent">
               <TrendingUp className="h-3 w-3" />
               {result.savings}% off
             </span>
           )}
         </div>
-        <Button variant="outline" size="sm" className="gap-2 bg-transparent" disabled={!result.inStock}>
-          View Store
-        </Button>
       </div>
     </div>
   )
@@ -212,10 +149,9 @@ function ResultsSection({ ingredient, results }: { ingredient: string; results: 
         </h2>
         <p className="text-muted-foreground">Found {results.length} stores • Sorted by best price</p>
       </div>
-
       <div className="grid gap-6 md:grid-cols-2">
         {results.map((result) => (
-          <ResultCard key={result.id} result={result} isLowestPrice={result.price === lowestPrice} />
+          <ResultCard key={result.storeName} result={result} isLowestPrice={result.price === lowestPrice} />
         ))}
       </div>
     </div>
@@ -235,14 +171,28 @@ export default function SearchPage() {
     setIsLoading(true)
     setSearchQuery(query)
 
-    // Simulate API call - replace with actual API call
-    // Example: const response = await fetch(`/api/search?ingredient=${query}`)
-    // const data = await response.json()
+    try {
+      const response = await fetch(`/api/prices?grocery=${encodeURIComponent(query)}`)
+      if (!response.ok) throw new Error("Failed to fetch prices")
+      const data = await response.json()
 
-    setTimeout(() => {
-      setResults(CONTENT.mockResults)
+      const resultsArray: StoreResult[] = Object.entries(data.results).map(([storeName, info]: any) => ({
+        storeName,
+        location: info.location || "",
+        price: info.price,
+        unit: info.unit || "",
+        inStock: info.inStock ?? true,
+        savings: info.savings ?? 0,
+        distance: info.distance || "",
+      }))
+
+      setResults(resultsArray)
+    } catch (err) {
+      console.error(err)
+      setResults([])
+    } finally {
       setIsLoading(false)
-    }, 800)
+    }
   }
 
   return (
@@ -262,8 +212,10 @@ export default function SearchPage() {
           )}
 
           {!isLoading && !results && <EmptyState />}
-
-          {!isLoading && results && <ResultsSection ingredient={searchQuery} results={results} />}
+          {!isLoading && results && results.length === 0 && (
+            <p className="text-muted-foreground mt-4">No results found for "{searchQuery}".</p>
+          )}
+          {!isLoading && results && results.length > 0 && <ResultsSection ingredient={searchQuery} results={results} />}
         </div>
       </main>
     </div>
