@@ -22,27 +22,6 @@ interface StoreResult {
 // COMPONENTS
 // ============================================
 
-function Header() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-20 items-center justify-between px-6 lg:px-8">
-        <a href="/" className="flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-            <ShoppingCart className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-xl font-semibold tracking-tight text-foreground">Food For Zot</span>
-        </a>
-        <Button variant="ghost" size="sm" asChild>
-          <a href="/" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
-          </a>
-        </Button>
-      </div>
-    </header>
-  )
-}
-
 function SearchBar({ onSearch, isLoading }: { onSearch: (query: string) => void; isLoading: boolean }) {
   const [query, setQuery] = useState("")
 
@@ -70,8 +49,8 @@ function SearchBar({ onSearch, isLoading }: { onSearch: (query: string) => void;
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
+    <div className="flex flex-col items-center justify-center text-center">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
         <Search className="h-10 w-10 text-primary" />
       </div>
       <h2 className="mb-3 text-2xl font-semibold text-foreground">Find the Best Grocery Prices</h2>
@@ -211,16 +190,15 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header />
-      <main className="container mx-auto px-6 py-12 lg:px-8 lg:py-16">
-        <div className="flex flex-col items-center">
+    <div className="h-full pt-30">
+      <main className="h-full container mx-auto px-6 py-12 lg:px-8 lg:py-16">
+        <div className="flex flex-col h-full items-center">
           <div className="mb-12 w-full max-w-3xl">
             <SearchBar onSearch={handleSearch} isLoading={isLoading} />
           </div>
 
           {isLoading && (
-            <div className="flex flex-col items-center gap-4 py-24">
+            <div className="flex flex-col items-center gap-4">
               <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
               <p className="text-sm font-medium text-muted-foreground">Searching stores near you...</p>
             </div>

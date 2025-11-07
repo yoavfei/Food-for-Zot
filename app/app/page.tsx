@@ -1,6 +1,7 @@
 'use client'; // This page is interactive, so it must be a Client Component
 
 import { useState } from 'react';
+import { Search, Plus, Check, X, ListX } from 'lucide-react';
 
 // --- Define the data types ---
 interface GroceryItem {
@@ -56,13 +57,13 @@ export default function GroceriesDashboardPage() {
       lists.map((list) =>
         list.id === activeListId
           ? {
-              ...list,
-              items: list.items.map((item) =>
-                item.id === itemId
-                  ? { ...item, purchased: !item.purchased }
-                  : item
-              ),
-            }
+            ...list,
+            items: list.items.map((item) =>
+              item.id === itemId
+                ? { ...item, purchased: !item.purchased }
+                : item
+            ),
+          }
           : list
       )
     );
@@ -99,17 +100,15 @@ export default function GroceriesDashboardPage() {
       lists.map((list) =>
         list.id === activeListId
           ? {
-              ...list,
-              items: list.items.filter((item) => item.id !== itemId),
-            }
+            ...list,
+            items: list.items.filter((item) => item.id !== itemId),
+          }
           : list
       )
     );
   };
 
-  // --- Render ---
   return (
-    // Container is now full-width, letting parent layout control padding
     <div className="w-full bg-background/95">
       {/* 1. Header */}
       <h1 className="text-4xl font-extrabold text-gray-800 mb-6">
@@ -117,16 +116,15 @@ export default function GroceriesDashboardPage() {
       </h1>
 
       {/* 2. Tabbed List Navigation */}
-      <div className="flex items-center border-b border-gray-200 mb-6">
+      <div className="flex items-center border-b-1 border-gray-200 mb-6">
         {lists.map((list) => (
           <button
             key={list.id}
             onClick={() => setActiveListId(list.id)}
-            className={`py-3 px-5 text-lg font-semibold transition-all duration-150 cursor-pointer
-              ${
-                activeListId === list.id
-                  ? 'border-b-2 border-green-600 text-green-600'
-                  : 'text-gray-500 hover:text-gray-700'
+            className={`py-3 px-5 text-lg font-semibold transition-all duration-150 cursor-pointer border-b-2
+              ${activeListId === list.id
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
           >
             {list.name}
@@ -142,61 +140,93 @@ export default function GroceriesDashboardPage() {
 
       {/* 3. Add New Item Form */}
       <form onSubmit={handleAddItem} className="flex gap-3 mb-6">
-        <input
-          type="text"
-          value={newItemName}
-          onChange={(e) => setNewItemName(e.target.value)}
-          placeholder="E.g., 2% Milk"
-          className="flex-1 px-4 py-3 border bg-white border-gray-300 rounded-lg shadow-sm 
-                     focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
+
+        {/* Search Bar Input */}
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            placeholder="Search or add an item (e.g., 2% Milk)"
+            className="flex-1 w-full pl-12 pr-4 py-3 border bg-white border-gray-300 rounded-lg shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
+        {/* Add Button (Icon-only) */}
         <button
           type="submit"
-          className="px-6 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md 
-                     hover:bg-green-700 focus:outline-none focus:ring-2 
-                     focus:ring-green-500 focus:ring-offset-2 cursor-pointer"
+          className="flex-shrink-0 px-4 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md 
+               hover:bg-green-700 focus:outline-none focus:ring-2 
+               focus:ring-green-500 focus:ring-offset-2 cursor-pointer
+               flex items-center justify-center"
+          aria-label="Add item"
         >
-          Add
+          <Plus className="h-5 w-5" />
         </button>
       </form>
 
       {/* 4. Active Grocery List Items */}
-      <div className="rounded-lg overflow-hidden">
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
         <ul className="divide-y divide-gray-200">
           {activeList && activeList.items.length > 0 ? (
             activeList.items.map((item) => (
               <li
                 key={item.id}
-                className="flex items-center px-6 py-4 transition-all 
-                           hover:bg-gray-50"
+                className="flex items-center gap-4 px-4 py-4 transition-all hover:bg-gray-50"
               >
-                <input
-                  type="checkbox"
-                  checked={item.purchased}
-                  onChange={() => handleToggleItem(item.id)}
-                  className="h-6 w-6 text-green-600 rounded 
-                             focus:ring-green-500 cursor-pointer"
-                />
+                {/* --- Modern Checkbox --- */}
+                <button
+                  onClick={() => handleToggleItem(item.id)}
+                  className={`
+              flex-shrink-0 h-6 w-6 rounded-md border-2 
+              flex items-center justify-center transition-all cursor-pointer
+              focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2
+              ${item.purchased
+                      ? 'bg-green-600 border-green-600'
+                      : 'border-gray-300 bg-white hover:border-gray-400'
+                    }
+            `}
+                  aria-label="Toggle item"
+                >
+                  {item.purchased && <Check className="h-4 w-4 text-white" />}
+                </button>
+
+                {/* --- Item Name --- */}
                 <span
-                  className={`ml-4 text-lg text-gray-800
-                    ${item.purchased ? 'line-through text-gray-400' : ''}`}
+                  className={`
+              flex-1 text-base font-medium text-gray-700
+              ${item.purchased ? 'line-through text-gray-400' : ''}
+            `}
                 >
                   {item.name}
                 </span>
+
+                {/* --- Delete Button --- */}
                 <button
                   onClick={() => handleDeleteItem(item.id)}
-                  className="ml-auto text-gray-400 hover:text-red-500 font-bold text-xl 
-                             opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                  className="ml-auto p-1 text-gray-400 hover:text-red-600 
+                       rounded-full hover:bg-red-100 transition-all cursor-pointer"
                   aria-label="Delete item"
                 >
-                  &times;
+                  <X className="h-5 w-5" />
                 </button>
               </li>
             ))
           ) : (
-            <p className="text-center text-gray-500 p-10">
-              No items in this list yet.
-            </p>
+            // --- Modern Empty State ---
+            <li className="flex flex-col items-center justify-center text-center p-12">
+              <ListX className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-700">
+                List is Empty
+              </h3>
+              <p className="text-sm text-gray-500">
+                Use the search bar above to add your first item.
+              </p>
+            </li>
           )}
         </ul>
       </div>
