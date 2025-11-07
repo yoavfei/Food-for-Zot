@@ -4,7 +4,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from scraper.scrapers import get_walmart_prices, get_target_prices
+from scraper.scrapers import get_walmart_prices, get_target_prices, get_kroger_prices
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for Next.js frontend
@@ -337,6 +337,7 @@ def get_prices():
     try:
         results["walmart"] = get_walmart_prices(item)
         results["target"] = get_target_prices(item)
+        results["kroger"] = get_kroger_prices(item)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
