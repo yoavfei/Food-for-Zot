@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import {
   Plus,
   Trash2,
   ChevronLeft,
   Save,
   Image as ImageIcon,
-  Clock, // Import Clock icon
+  Clock,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -18,21 +19,80 @@ interface IngredientField {
   quantity: string;
 }
 
-export default function NewRecipePage() {
+interface RecipeData {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  instructions: string;
+  ingredients: { name: string; amount: string }[];
+  ownerId: string;
+  prepTime?: string;
+  cookTime?: string;
+}
+
+export default function EditRecipePage() {
   const router = useRouter();
+  const params = useParams();
   const { user } = useAuth();
+  const recipeId = params.recipeId as string;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [prepTime, setPrepTime] = useState(''); // New State
-  const [cookTime, setCookTime] = useState(''); // New State
+  const [prepTime, setPrepTime] = useState('');
+  const [cookTime, setCookTime] = useState('');
   const [ingredients, setIngredients] = useState<IngredientField[]>([
     { id: '1', name: '', quantity: '' },
   ]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  useEffect(() => {
+    if (!recipeId || !user) return;
+
+    const fetchRecipe = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/recipes/${recipeId}`);
+        if (!res.ok) throw new Error('Recipe not found');
+
+        const data: RecipeData = await res.json();
+
+        if (data.ownerId !== user.uid) {
+          alert("You don't have permission to edit this recipe.");
+          router.replace('/app/recipes');
+          return;
+        }
+
+        setName(data.name);
+        setDescription(data.description || '');
+        setImageUrl(data.imageUrl || '');
+        setPrepTime(data.prepTime || '');
+        setCookTime(data.cookTime || '');
+        setIngredients(
+          data.ingredients.length > 0
+            ? data.ingredients.map((ing, i) => ({
+              id: `ing-${i}`,
+              name: ing.name,
+              quantity: ing.amount,
+            }))
+            : [{ id: '1', name: '', quantity: '' }]
+        );
+      } catch (err) {
+        console.error(err);
+        alert('Failed to load recipe data.');
+        router.push('/app/recipes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRecipe();
+  }, [recipeId, user, router, API_URL]);
 
   const handleIngredientChange = (
     id: string,
@@ -60,11 +120,7 @@ export default function NewRecipePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!user) {
-      alert('You must be logged in to create a recipe.');
-      return;
-    }
+    if (!user) return;
 
     setIsSubmitting(true);
 
@@ -76,36 +132,41 @@ export default function NewRecipePage() {
     const recipeData = {
       name,
       description,
-      imageUrl: imageUrl || '',
-      prepTime: prepTime || '', // Add to data
-      cookTime: cookTime || '', // Add to data
+      imageUrl,
+      prepTime,
+      cookTime,
       ingredients: finalIngredients,
-      ownerId: user.uid,
     };
 
     try {
-      const res = await fetch(`${API_URL}/api/recipes`, {
-        method: 'POST',
+      const res = await fetch(`${API_URL}/api/recipes/${recipeId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(recipeData),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(
-          errorData.error || 'Failed to save recipe on the server.'
-        );
+        throw new Error(errorData.error || 'Failed to update recipe.');
       }
 
-      alert('Recipe saved successfully!');
+      alert('Recipe updated successfully!');
       router.push('/app/recipes');
     } catch (err: any) {
-      console.error('Error saving recipe:', err);
+      console.error('Error updating recipe:', err);
       alert(`An error occurred: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-12 mt-10">
+        <Loader2 className="h-16 w-16 text-green-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
@@ -117,14 +178,14 @@ export default function NewRecipePage() {
               type="button"
               onClick={() => router.back()}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 
-                     font-semibold transition-all mb-4"
+                               font-semibold transition-all mb-4"
               title="Go Back"
             >
               <ChevronLeft className="h-5 w-5" />
               Go Back
             </button>
             <h1 className="text-5xl font-extrabold text-gray-800">
-              Create New Recipe
+              Edit Recipe
             </h1>
           </div>
           <button
@@ -136,7 +197,7 @@ export default function NewRecipePage() {
                        focus:ring-offset-2 transition-all disabled:bg-gray-400"
           >
             <Save className="h-5 w-5" />
-            {isSubmitting ? 'Saving...' : 'Save Recipe'}
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
 
@@ -198,11 +259,13 @@ export default function NewRecipePage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                              focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-                <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <ImageIcon
+                  className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                  aria-hidden="true"
+                />
               </div>
             </div>
 
-            {/* --- NEW TIME INPUTS --- */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label
@@ -221,7 +284,10 @@ export default function NewRecipePage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                                focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Clock
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
               <div className="flex-1">
@@ -241,11 +307,13 @@ export default function NewRecipePage() {
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg shadow-sm 
                                focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Clock
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
             </div>
-            {/* --- END OF NEW INPUTS --- */}
           </div>
 
           {/* Right Column: Ingredients */}

@@ -1,226 +1,248 @@
-'use client'; // This page needs state and event handlers
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Pencil, ClipboardPlus, BookOpen } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  ClipboardPlus,
+  BookOpen,
+  Loader2,
+  AlertTriangle,
+} from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
-// --- Define the data types ---
 interface Ingredient {
-  id: string;
+  id?: string;
   name: string;
-  quantity: string;
+  amount: string;
+  quantity?: string;
 }
 
 interface Recipe {
   id: string;
   name: string;
-  description: string;
-  imageUrl: string;
+  description?: string;
+  imageUrl?: string;
+  instructions: string;
   ingredients: Ingredient[];
+  ownerId: string;
+  prepTime?: string; // Add new field
+  cookTime?: string; // Add new field
 }
 
-// --- Mock Data (Backend replacement) ---
-const MOCK_RECIPES: Recipe[] = [
-  {
-    id: 'r1',
-    name: 'Classic Chicken Soup',
-    description: 'A comforting and nourishing classic, perfect for a cold day.',
-    imageUrl: 'https://placehold.co/600x400/a7f3d0/34495e?text=Chicken+Soup',
-    ingredients: [
-      { id: 'i1', name: 'Chicken Breast', quantity: '2 lbs' },
-      { id: 'i2', name: 'Carrots', quantity: '3' },
-      { id: 'i3', name: 'Celery', quantity: '3 stalks' },
-    ],
-  },
-  {
-    id: 'r2',
-    name: 'Spaghetti Carbonara',
-    description: 'A quick and delicious Italian pasta dish for any night.',
-    imageUrl: 'https://placehold.co/600x400/fde68a/34495e?text=Carbonara',
-    ingredients: [
-      { id: 'i4', name: 'Spaghetti', quantity: '400g' },
-      { id: 'i5', name: 'Guanciale', quantity: '150g' },
-      { id: 'i6', name: 'Pecorino Cheese', quantity: '1 cup' },
-      { id: 'i7', name: 'Eggs', quantity: '3' },
-    ],
-  },
-  {
-    id: 'r3',
-    name: 'Avocado Toast',
-    description: 'The quintessential modern breakfast. Simple and satisfying.',
-    imageUrl: 'https://placehold.co/600x400/bef264/34495e?text=Avocado+Toast',
-    ingredients: [
-      { id: 'i8', name: 'Sourdough Bread', quantity: '2 slices' },
-      { id: 'i9', name: 'Avocado', quantity: '1' },
-      { id: 'i10', name: 'Red Pepper Flakes', quantity: '1 tsp' },
-    ],
-  },
-];
+const LoadingState = () => (
+  <div className="flex justify-center items-center p-12 mt-10">
+    <Loader2 className="h-16 w-16 text-green-600 animate-spin" />
+  </div>
+);
 
-// --- Main Page Component ---
+const ErrorState = ({ message }: { message: string }) => (
+  <div className="flex flex-col items-center justify-center text-center p-12 mt-10 bg-red-50 rounded-2xl shadow-sm border border-red-200">
+    <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
+    <h2 className="text-2xl font-semibold text-red-800 mb-2">
+      Error Fetching Recipes
+    </h2>
+    <p className="text-red-600 max-w-sm">{message}</p>
+  </div>
+);
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center text-center p-12 mt-10 bg-white rounded-2xl shadow-sm border border-gray-200">
+    <BookOpen className="h-16 w-16 text-gray-400 mb-4" />
+    <h2 className="text-2xl font-semibold text-gray-800 mb-2">
+      No Recipes Yet
+    </h2>
+    <p className="text-gray-500 mb-6 max-w-sm">
+      Looks like you haven't added any recipes. Start by creating your first
+      one!
+    </p>
+    <Link
+      href="/app/recipes/new"
+      className="flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all"
+    >
+      <Plus className="h-5 w-5" />
+      Create Your First Recipe
+    </Link>
+  </div>
+);
+
 export default function MyRecipesPage() {
-  const [recipes, setRecipes] = useState<Recipe[]>(MOCK_RECIPES);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const router = useRouter();
 
-  /**
-   * Handles adding all ingredients from a recipe to the main grocery list.
-   * (This would call your backend in a real app)
-   */
-  const handleAddToList = (recipe: Recipe) => {
-    // 1. Get ingredients from the recipe
-    const itemsToAdd = recipe.ingredients
-      .map((ing) => `${ing.name} (${ing.quantity})`)
-      .join('\n');
+  const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-    // 2. Mock the "add to list" functionality
-    alert(`The following items would be added to your 'Weekly Shop':\n${itemsToAdd}`);
+  useEffect(() => {
+    if (!user) return;
 
-    // 3. (Future) Call your backend API:
-    // await fetch(`/api/lists/YOUR_ACTIVE_LIST_ID/items`, {
-    //   method: 'POST',
-    //   body: JSON.stringify(recipe.ingredients.map(ing => ({ name: ing.name, quantity: ing.quantity })))
-    // });
-  };
+    const fetchRecipes = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_URL}/api/recipes?userId=${user.uid}`);
+        if (!res.ok) {
+          throw new Error('Failed to fetch recipes from the server.');
+        }
+        const data: Recipe[] = await res.json();
+        setRecipes(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  /**
-   * Handles deleting a recipe.
-   */
-  const handleDelete = (recipeId: string) => {
-    if (
-      window.confirm('Are you sure you want to delete this recipe?')
-    ) {
-      setRecipes(recipes.filter((r) => r.id !== recipeId));
-      // (Future) Call backend:
-      // await fetch(`/api/recipes/${recipeId}`, { method: 'DELETE' });
+    fetchRecipes();
+  }, [user]);
+
+  const handleAddToList = async (recipe: Recipe) => {
+    const itemsToAdd = recipe.ingredients.map((ing) => ({
+      name: `${ing.name} (${ing.amount || ing.quantity})`,
+      purchased: false,
+    }));
+
+    alert(
+      `Mock Add: Adding ${itemsToAdd.length} items to your grocery list.`
+    );
+
+    try {
+      const listId = 'YOUR_ACTIVE_LIST_ID';
+      await Promise.all(
+        itemsToAdd.map(item =>
+          fetch(`${API_URL}/api/lists/${listId}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item),
+          })
+        )
+      );
+    } catch (err) {
+      console.error('Failed to add items to list:', err);
+      alert('Error: Could not add items to list.');
     }
   };
 
-  /**
-   * Handles navigating to the edit page.
-   */
+  const handleDelete = async (recipeId: string) => {
+    if (!window.confirm('Are you sure you want to delete this recipe?')) {
+      return;
+    }
+
+    const originalRecipes = [...recipes];
+    setRecipes(recipes.filter((r) => r.id !== recipeId));
+
+    try {
+      const res = await fetch(`${API_URL}/api/recipes/${recipeId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error('Failed to delete on server.');
+      }
+    } catch (err) {
+      console.error('Failed to delete recipe:', err);
+      alert('Error: Could not delete recipe. Restoring list.');
+      setRecipes(originalRecipes);
+    }
+  };
+
   const handleEdit = (recipeId: string) => {
-    router.push(`/app/recipes/edit/${recipeId}`); // Assumes an [id] route
+    router.push(`/app/recipes/edit/${recipeId}`);
+  };
+
+  const handleSelect = (recipeId: string) => {
+    router.push(`/app/recipes/${recipeId}`);
+  }
+
+  const renderContent = () => {
+    if (isLoading) {
+      return <LoadingState />;
+    }
+    if (error) {
+      return <ErrorState message={error} />;
+    }
+    if (recipes.length === 0) {
+      return <EmptyState />;
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {recipes.map((recipe) => (
+          <div
+            key={recipe.id}
+            className="flex flex-col bg-white rounded-2xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl"
+          >
+            <img
+              src={recipe.imageUrl || `https://placehold.co/600x400/a7f3d0/34495e?text=${recipe.name}`}
+              alt={recipe.name}
+              className="w-full h-48 object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'https://placehold.co/600x400/e0e0e0/7f8c8d?text=Image+Error';
+              }}
+            />
+
+            <div className="p-6 flex-1">
+              <h3 className="text-2xl font-bold text-gray-800 mb-2" onClick={() => handleSelect(recipe.id)} style={{ cursor: 'pointer' }}>
+                {recipe.name}
+              </h3>
+              <p className="text-gray-600 text-base line-clamp-3">
+                {recipe.description
+                  || (recipe.instructions ? recipe.instructions.substring(0, 100) + '...' : null)
+                  || 'No description available.'}
+              </p>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
+              <button
+                onClick={() => handleAddToList(recipe)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-green-700 bg-green-100 rounded-lg hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+              >
+                <ClipboardPlus className="h-4 w-4" />
+                Add to List
+              </button>
+
+              <div className="flex">
+                <button
+                  onClick={() => handleEdit(recipe.id)}
+                  className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-gray-200 transition-all"
+                  title="Edit Recipe"
+                >
+                  <Pencil className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(recipe.id)}
+                  className="p-2 text-gray-500 hover:text-red-600 rounded-full hover:bg-gray-200 transition-all"
+                  title="Delete Recipe"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
     <div className="w-full">
-      {/* 1. Page Header and "New Recipe" Button */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-4xl font-extrabold text-gray-800">My Recipes</h1>
-        
         <Link
           href="/app/recipes/new"
-          className="flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white 
-                     bg-green-600 rounded-lg shadow-md hover:bg-green-700 
-                     focus:outline-none focus:ring-2 focus:ring-green-500 
-                     focus:ring-offset-2 transition-all"
+          className="flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all"
         >
           <Plus className="h-5 w-5" />
           New Recipe
         </Link>
       </div>
 
-      {/* 2. Recipe Grid or Empty State */}
-      {recipes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          
-          {/* --- Recipe Card (Inlined) --- */}
-          {recipes.map((recipe) => (
-            <div
-              key={recipe.id}
-              className="flex flex-col bg-white rounded-2xl shadow-lg 
-                         overflow-hidden transition-all duration-300 hover:shadow-xl"
-            >
-              {/* Card Image */}
-              <img
-                src={recipe.imageUrl}
-                alt={recipe.name}
-                className="w-full h-48 object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://placehold.co/600x400/e0e0e0/7f8c8d?text=Image+Error';
-                }}
-              />
-              
-              {/* Card Content */}
-              <div className="p-6 flex-1">
-                <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                  {recipe.name}
-                </h3>
-                <p className="text-gray-600 text-base line-clamp-3">
-                  {recipe.description}
-                </p>
-              </div>
-
-              {/* Card Actions */}
-              <div className="p-4 bg-gray-50 border-t border-gray-100 
-                            flex items-center justify-between gap-2">
-                
-                {/* Primary Action */}
-                <button
-                  onClick={() => handleAddToList(recipe)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold 
-                             text-green-700 bg-green-100 rounded-lg 
-                             hover:bg-green-200 focus:outline-none 
-                             focus:ring-2 focus:ring-green-500 transition-all"
-                >
-                  <ClipboardPlus className="h-4 w-4" />
-                  Add to List
-                </button>
-                
-                {/* Secondary Actions */}
-                <div className="flex">
-                  <button
-                    onClick={() => handleEdit(recipe.id)}
-                    className="p-2 text-gray-500 hover:text-blue-600 
-                               rounded-full hover:bg-gray-200 transition-all"
-                    title="Edit Recipe"
-                  >
-                    <Pencil className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(recipe.id)}
-                    className="p-2 text-gray-500 hover:text-red-600 
-                               rounded-full hover:bg-gray-200 transition-all"
-                    title="Delete Recipe"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          {/* --- End of Recipe Card --- */}
-
-        </div>
-      ) : (
-        
-        // --- Empty State (Inlined) ---
-        <div className="flex flex-col items-center justify-center 
-                      text-center p-12 mt-10 bg-white 
-                      rounded-2xl shadow-sm border border-gray-200"
-        >
-          <BookOpen className="h-16 w-16 text-gray-400 mb-4" />
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-            No Recipes Yet
-          </h2>
-          <p className="text-gray-500 mb-6 max-w-sm">
-            Looks like you haven't added any recipes. Start by creating your first one!
-          </p>
-          <Link
-            href="/app/recipes/new"
-            className="flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white 
-                       bg-green-600 rounded-lg shadow-md hover:bg-green-700 
-                       focus:outline-none focus:ring-2 focus:ring-green-500 
-                       focus:ring-offset-2 transition-all"
-          >
-            <Plus className="h-5 w-5" />
-            Create Your First Recipe
-          </Link>
-        </div>
-        // --- End of Empty State ---
-
-      )}
+      {renderContent()}
     </div>
   );
 }
