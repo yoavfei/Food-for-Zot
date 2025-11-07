@@ -209,6 +209,19 @@ def get_user_recipes():
         return jsonify(recipes), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/recipes/<recipe_id>', methods=['GET'])
+def get_recipe(recipe_id):
+    """ Gets a single recipe document by its ID. """
+    try:
+        doc = db.collection('recipes').document(recipe_id).get()
+        if doc.exists:
+            recipe_data = doc.to_dict()
+            recipe_data['id'] = doc.id
+            return jsonify(recipe_data)
+        return jsonify({'error': 'Recipe not found'}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/recipes/<recipe_id>', methods=['PATCH'])
 def update_recipe_route(recipe_id):
