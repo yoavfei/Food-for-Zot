@@ -2,15 +2,19 @@ from .utils import fetch_html
 
 def get_walmart_prices(item: str):
     query = item.replace(" ", "+")
+    print(query)
     url = f"https://www.walmart.com/search?q={query}"
-
+    print(url)
     soup = fetch_html(url)
     results = []
-
-    for product in soup.select("div.mb1"):
+    print(soup)
+    print(soup.find_all('span', {'class': 'price'}))
+    for product in soup.find_all('div', {'data-type': 'items'}):
         title = product.select_one("a.w_iUH7").get_text(strip=True) if product.select_one("a.w_iUH7") else None
         price = product.select_one("span.price-group")
         price_text = price.get_text(strip=True) if price else None
+
+        print(title, price, price_text)
 
         if title and price_text:
             results.append({"name": title, "price": price_text})
