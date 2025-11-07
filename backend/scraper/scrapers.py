@@ -1,4 +1,43 @@
 from .utils import fetch_html
+import requests
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import os
+
+load_dotenv()
+API_BASE = "https://openpricengine.com/api/v1/stores/products/names/plan"
+API_KEY = os.getenv('OPEN_PRICE_API_KEY')
+USA_STORES = ['traderjoes', 'aldi', 'tj']
+
+
+def get_food_prices(product_name, currency="Default"):
+    url = 'https://openpricengine.com/api/v1/multiple_stores/prices/query'
+    headers = {
+        'accept': 'application/json',
+        'Authorization': API_KEY
+    }
+    
+    results = {}
+
+    for store in USA_STORES:
+        params = {
+            'stores': [store],
+            'productname': product_name,
+            'start_date': '2025-11-05',
+            'end_date': '2025-11-06',
+            'currency': currency
+        }
+
+        response = requests.get(url, headers=headers, params=params)
+        data = response.json()
+
+        if data:
+            results[store] = data[:3]
+
+    return results
+
+
+
 
 def get_walmart_prices(item: str):
     query = item.replace(" ", "+")
@@ -60,3 +99,5 @@ def get_kroger_prices(item: str):
             break
 
     return results
+
+
