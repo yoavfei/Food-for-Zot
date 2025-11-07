@@ -40,3 +40,23 @@ def get_target_prices(item: str):
             break
 
     return results
+
+
+def get_kroger_prices(item: str):
+    query = item.replace(" ", "-")
+    url = f"https://www.kroger.com/search?query={query}"
+    soup = fetch_html(url)
+    results = []
+
+    for product in soup.select("div.AutoGrid-cell"):
+        title = product.select_one("h3.ProductName").get_text(strip=True) if product.select_one("h3.ProductName") else None
+        price_el = product.select_one("data[data-qa='ProductPrice']")
+        price = price_el.get_text(strip=True) if price_el else None
+
+        if title and price:
+            results.append({"name": title, "price": price})
+
+        if len(results) >= 5:
+            break
+
+    return results
