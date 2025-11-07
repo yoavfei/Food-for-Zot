@@ -7,7 +7,7 @@ import os
 load_dotenv()
 API_BASE = "https://openpricengine.com/api/v1/stores/products/names/plan"
 API_KEY = os.getenv('OPEN_PRICE_API_KEY')
-USA_STORES = ['traderjoes', 'aldi', 'tj']
+USA_STORES = ['traderjoes']
 
 
 def get_food_prices(product_name, currency="Default"):
@@ -28,15 +28,26 @@ def get_food_prices(product_name, currency="Default"):
             'currency': currency
         }
 
-        response = requests.get(url, headers=headers, params=params)
-        data = response.json()
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            
+            response.raise_for_status() 
+            
+            data = response.json()
 
-        if data:
-            results[store] = data[:3]
+            if data:
+                results[store] = data
+            else:
+                results[store] = [] 
+
+        except requests.exceptions.RequestException as e:
+            print(f"API Error for {store}: {e}")
+            results[store] = []
+        except requests.exceptions.JSONDecodeError as e:
+            print(f"JSON Decode Error for {store}: {e}")
+            results[store] = []
 
     return results
-
-
 
 
 def get_walmart_prices(item: str):

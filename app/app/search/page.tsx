@@ -1,21 +1,30 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ShoppingCart, Search, MapPin, TrendingUp, ArrowLeft } from "lucide-react"
+import { ShoppingCart, Search, MapPin, TrendingUp, ArrowLeft, Loader2, AlertTriangle } from "lucide-react"
 
 // ============================================
 // TYPES
 // ============================================
 
+// This interface now maps to the *frontend* display card
 interface StoreResult {
   storeName: string
-  location?: string
+  productName: string
+  productUrl: string
+  location: string
   price: number
-  unit?: string
-  inStock?: boolean
-  savings?: number
-  distance?: string
+  inStock: boolean
+}
+
+// This interface maps to the *backend* API response
+interface ApiResponseItem {
+  Store: string
+  "Product Name": string
+  "Product URL": string
+  Country: string
+  "Price over time": { Date: string, Price: number }[]
+  // ... other fields
 }
 
 // ============================================
@@ -61,12 +70,25 @@ function EmptyState() {
   )
 }
 
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center text-center">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
+        <AlertTriangle className="h-10 w-10 text-red-600" />
+      </div>
+      <h2 className="mb-3 text-2xl font-semibold text-foreground">An Error Occurred</h2>
+      <p className="max-w-md text-pretty text-red-600">
+        {message}
+      </p>
+    </div>
+  )
+}
+
 function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPrice: boolean }) {
   return (
     <div
-      className={`group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg ${
-        isLowestPrice ? "border-primary/50 ring-2 ring-primary/20" : "border-border/50"
-      }`}
+      className={`group relative overflow-hidden rounded-2xl border bg-card p-8 transition-all hover:shadow-lg ${isLowestPrice ? "border-primary/50 ring-2 ring-primary/20" : "border-border/50"
+        }`}
     >
       {isLowestPrice && (
         <div className="absolute right-4 top-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
@@ -78,22 +100,27 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
           <h3 className="mb-1 text-xl font-semibold text-card-foreground">{result.storeName}</h3>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            <span>{result.location || ""}</span>
-            {result.distance && (
-              <>
-                <span>•</span>
-                <span>{result.distance}</span>
-              </>
-            )}
+            <span>{result.location}</span>
           </div>
         </div>
       </div>
-      <div className="flex items-baseline gap-2">
+
+      {/* Product name is now on the card */}
+      <a
+        href={result.productUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-lg font-medium text-foreground hover:text-primary transition-colors"
+      >
+        {result.productName}
+      </a>
+
+      <div className="flex items-baseline gap-2 mt-2">
         <span className="text-4xl font-semibold text-foreground">
           ${result.price.toFixed(2)}
         </span>
-        {result.unit && <span className="text-base text-muted-foreground">/ {result.unit}</span>}
       </div>
+
       <div className="mt-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {result.inStock ? (
@@ -105,12 +132,6 @@ function ResultCard({ result, isLowestPrice }: { result: StoreResult; isLowestPr
             <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
               <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
               Out of Stock
-            </span>
-          )}
-          {result.savings && result.savings > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent">
-              <TrendingUp className="h-3 w-3" />
-              {result.savings}% off
             </span>
           )}
         </div>
@@ -128,11 +149,12 @@ function ResultsSection({ ingredient, results }: { ingredient: string; results: 
         <h2 className="mb-2 text-3xl font-semibold text-foreground">
           Results for <span className="text-primary">{ingredient}</span>
         </h2>
-        <p className="text-muted-foreground">Found {results.length} stores • Sorted by best price</p>
+        {/* UPDATED TEXT: */}
+        <p className="text-muted-foreground">Found {results.length} prices • Sorted by relevance</p>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
-        {results.map((result) => (
-          <ResultCard key={result.storeName} result={result} isLowestPrice={result.price === lowestPrice} />
+        {results.map((result, index) => (
+          <ResultCard key={`${result.storeName}-${index}`} result={result} isLowestPrice={result.price === lowestPrice} />
         ))}
       </div>
     </div>
@@ -147,43 +169,70 @@ export default function SearchPage() {
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [results, setResults] = useState<StoreResult[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const handleSearch = async (query: string) => {
     setIsLoading(true)
     setSearchQuery(query)
+    setResults(null)
+    setError(null)
 
     try {
-      const response = await fetch(`http://127.0.0.1:5000/api/prices?grocery=${query}`)
-      if (!response.ok) throw new Error("Failed to fetch prices")
-      const data = await response.json()
+      // --- STEP 1: Get janky, unsorted results from the price API ---
+      const priceResponse = await fetch(`${API_URL}/api/prices?grocery=${query}`)
+      if (!priceResponse.ok) throw new Error("Failed to fetch prices from the server.")
 
-      // Flatten results, handle both array of results or single object
+      const data = await priceResponse.json()
+
       const resultsArray: StoreResult[] = Object.entries(data.results).flatMap(([storeName, items]: any) => {
-        // items may be array or object
-        const storeItems = Array.isArray(items) ? items : [items]
-        return storeItems.map((item: any) => ({
-          storeName,
-          location: item.location || "",
-          unit: item.unit || "",
-          inStock: item.inStock ?? true,
-          savings: item.savings ?? 0,
-          distance: item.distance || "",
-          // Ensure price is number
-          price: typeof item.price === "string"
-            ? parseFloat(item.price.replace("$", "")) || 0
-            : item.price ?? 0,
-        }))
-      })
+        const storeItems: ApiResponseItem[] = Array.isArray(items) ? items : [items]
 
-      setResults(resultsArray)
-    } catch (err) {
+        return storeItems.flatMap((item: ApiResponseItem) => {
+          const priceHistory = item["Price over time"];
+          if (!priceHistory || priceHistory.length === 0) return [];
+
+          const latestPriceInfo = priceHistory[priceHistory.length - 1];
+          const priceNum = parseFloat(String(latestPriceInfo.Price));
+
+          if (isNaN(priceNum) || priceNum <= 0) return [];
+
+          return [{
+            storeName: item.Store || storeName,
+            productName: item["Product Name"],
+            productUrl: item["Product URL"],
+            location: item.Country || "Location N/A",
+            price: priceNum,
+            inStock: true,
+          }];
+        });
+      });
+
+      // --- STEP 2: Send the janky results to our AI to be ranked ---
+      if (resultsArray.length > 0) {
+        const rankResponse = await fetch(`${API_URL}/api/prices/rank`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query, results: resultsArray })
+        });
+
+        if (!rankResponse.ok) {
+          // If ranking fails, just show price-sorted results
+          setResults(resultsArray.sort((a, b) => a.price - b.price));
+        } else {
+          // Set results to the new, AI-sorted list!
+          const sortedResults = await rankResponse.json();
+          setResults(sortedResults);
+        }
+      } else {
+        setResults([]); // No results found
+      }
+
+    } catch (err: any) {
       console.error(err)
-      // fallback hardcoded results
-      setResults([
-        { storeName: "Walmart", price: 3.49 },
-        { storeName: "Target", price: 4.29 },
-        { storeName: "Kroger", price: 4.99 },
-      ])
+      setError(err.message || "An unexpected error occurred.")
+      setResults(null)
     } finally {
       setIsLoading(false)
     }
@@ -199,16 +248,22 @@ export default function SearchPage() {
 
           {isLoading && (
             <div className="flex flex-col items-center gap-4">
-              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="text-sm font-medium text-muted-foreground">Searching stores near you...</p>
             </div>
           )}
 
-          {!isLoading && !results && <EmptyState />}
-          {!isLoading && results && results.length === 0 && (
+          {!isLoading && error && <ErrorState message={error} />}
+
+          {!isLoading && !error && !results && <EmptyState />}
+
+          {!isLoading && !error && results && results.length === 0 && (
             <p className="text-muted-foreground mt-4">No results found for "{searchQuery}".</p>
           )}
-          {!isLoading && results && results.length > 0 && <ResultsSection ingredient={searchQuery} results={results} />}
+
+          {!isLoading && !error && results && results.length > 0 && (
+            <ResultsSection ingredient={searchQuery} results={results} />
+          )}
         </div>
       </main>
     </div>

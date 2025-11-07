@@ -272,6 +272,33 @@ def get_ingredient_recipe_route():
         return jsonify(recipe_data), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+#######################################################
+# AI-Powered Price Ranking
+#######################################################
+
+@app.route("/api/prices/rank", methods=["POST"])
+def rank_prices():
+    """
+    Takes a search query and a list of product results,
+    and returns the list FILTERED and SORTED by relevance using Gemini.
+    """
+    try:
+        data = request.get_json()
+        query = data.get('query')
+        results = data.get('results')
+
+        if not query or not results:
+            return jsonify({"error": "Missing 'query' or 'results' in request"}), 400
+
+        # --- THIS IS THE FIX ---
+        # Call the new function
+        sorted_list = recipe_functions.filter_and_rank_products(query, results)
+        
+        return jsonify(sorted_list), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while ranking: {str(e)}"}), 500
         
 #######################################################
 # Web scrape for prices
@@ -285,23 +312,15 @@ def get_prices():
 
     try:
         results = get_food_prices(item) 
-
-        res = {}
-        for store_name, items in results.items():
-            res[store_name] = []
-            for item in items[:1]:
-                product_name = item['Product Name']
-                latest_price = item['Price over time'][-1]['Price']
-                res[store_name].append({"name": product_name, "price": latest_price})
+        
+        return jsonify({"grocery": item, "results": results})
 
     except Exception as e:
-        res = {
-            "Walmart": [{"name": "Eggs", "price": "$3.49"}],
-            "Target": [{"name": "Eggs", "price": "$4.29"}],
-            "Kroger": [{"name": "Eggs", "price": "$4.99"}],
-        }
-
-    return jsonify({"grocery": item, "results": res})
+        return jsonify({
+            "error": f"An error occurred while fetching prices: {str(e)}",
+            "grocery": item,
+            "results": {}
+        }), 500
 
 # --- Main entry point ---
 if __name__ == "__main__":
