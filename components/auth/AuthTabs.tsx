@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { Loader2 } from 'lucide-react';
 
 const navigateTo = (path: string) => {
   if (typeof window !== 'undefined') {
@@ -33,14 +34,16 @@ export default function AuthTabs() {
     }
   }, [user, authLoading, router]);
 
-  const createUserDocumentInDb = async (token: string, user: User) => {
-    await fetch('/api/users', {
+  const createUserDocumentInDb = async (user: User) => {
+    await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ email: user.email }),
+      body: JSON.stringify({
+        email: user.email,
+        uid: user.uid,
+      }),
     });
   };
 
@@ -51,22 +54,26 @@ export default function AuthTabs() {
 
     try {
       if (isLogin) {
+        // Handle Login
         await signInWithEmailAndPassword(auth, email, password);
       } else {
+        // Handle Sign Up
         const userCredential = await createUserWithEmailAndPassword(
           auth,
           email,
           password
         );
         const user = userCredential.user;
-        const token = await user.getIdToken();
 
-        await createUserDocumentInDb(token, user);
+        // We no longer need the token, just pass the user object
+        await createUserDocumentInDb(user);
       }
 
-      navigateTo('/app');
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      if (
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password'
+      ) {
         setError('Invalid email or password.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError('This email is already in use. Try logging in.');
@@ -77,6 +84,14 @@ export default function AuthTabs() {
       setIsLoading(false);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-12 w-12 animate-spin text-green-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md px-4 py-8 sm:px-10">
